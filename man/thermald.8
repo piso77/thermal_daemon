@@ -1,4 +1,4 @@
-.\" thermald (1) manual page
+.\" thermald (8) manual page
 .\"
 .\" This is free documentation; you can redistribute it and/or
 .\" modify it under the terms of the GNU General Public License as
@@ -21,7 +21,7 @@
 .\"
 .\" Copyright (C) 2012 Intel Corporation. All rights reserved.
 .\"
-.TH thermald "1" "8 May 2013"
+.TH thermald "8" "8 May 2013"
 
 .SH NAME
 thermald \- start Linux thermal daemon
@@ -36,7 +36,7 @@ temperature and applies compensation using available cooling methods.
 
 By default, it monitors CPU temperature using available CPU digital temperature sensors and maintains CPU temperature under control, before HW takes aggressive correction action. If there is a skin temperature sensor in thermal sysfs, then it tries to keep skin temperature under 45C.
 .TP
-Optionally thermal daemon can act as a primary thermal controller by using thermal sysfs or an comprehensive configuration using an XML configuration file (thermal-conf.xml). 
+Optionally thermal daemon can act as a primary thermal controller by using thermal sysfs or an comprehensive configuration using an XML configuration file (thermal-conf.xml).
 
 .SH OPTIONS
 .TP
@@ -67,4 +67,4 @@ Act as exclusive thermal controller. This will use user-space
 governor for thermal sysfs and take over control.
 
 .SH SEE ALSO
-thermal-conf.xml(1)
+thermal-conf.xml(5)
