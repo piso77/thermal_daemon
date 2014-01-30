@@ -150,7 +150,7 @@ int cthd_engine::thd_engine_start(bool ignore_cpuid_check) {
 	// Pipe is used for communication between two processes
 	ret = pipe(wake_fds);
 	if (ret) {
-		thd_log_error("Thermal sysfs: pipe creation failed %d: ", ret);
+		thd_log_error("Thermal sysfs: pipe creation failed %d:\n", ret);
 		return THD_FATAL_ERROR;
 	}
 	fcntl(wake_fds[0], F_SETFL, O_NONBLOCK);
@@ -171,21 +171,21 @@ int cthd_engine::thd_engine_start(bool ignore_cpuid_check) {
 
 	ret = read_thermal_sensors();
 	if (ret != THD_SUCCESS) {
-		thd_log_error("Thermal sysfs Error in reading sensors");
+		thd_log_error("Thermal sysfs Error in reading sensors\n");
 		// This is a fatal error and daemon will exit
 		return THD_FATAL_ERROR;
 	}
 
 	ret = read_cooling_devices();
 	if (ret != THD_SUCCESS) {
-		thd_log_error("Thermal sysfs Error in reading cooling devs");
+		thd_log_error("Thermal sysfs Error in reading cooling devs\n");
 		// This is a fatal error and daemon will exit
 		return THD_FATAL_ERROR;
 	}
 
 	ret = read_thermal_zones();
 	if (ret != THD_SUCCESS) {
-		thd_log_error("No thermal sensors found");
+		thd_log_error("No thermal sensors found\n");
 		// This is a fatal error and daemon will exit
 		return THD_FATAL_ERROR;
 	}
@@ -237,7 +237,7 @@ int cthd_engine::thd_engine_start(bool ignore_cpuid_check) {
 		if((childpid = fork()) == - 1)
 		{
 			perror("fork");
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 
 		if(childpid == 0)
@@ -506,7 +506,7 @@ void cthd_engine::giveup_thermal_control() {
 void cthd_engine::process_terminate() {
 	thd_log_warn("terminating on user request ..\n");
 	giveup_thermal_control();
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
 
 void cthd_engine::thd_engine_poll_enable(int sensor_id) {
@@ -529,7 +529,7 @@ void cthd_engine::thd_engine_reload_zones() {
 
 	int ret = read_thermal_zones();
 	if (ret != THD_SUCCESS) {
-		thd_log_error("No thermal sensors found");
+		thd_log_error("No thermal sensors found\n");
 		// This is a fatal error and daemon will exit
 		return;
 	}
@@ -562,11 +562,11 @@ int cthd_engine::check_cpu_id() {
 	asm("pushl %ebx;");
 #endif
 	asm("cpuid": "=a"(max_level), "=b"(ebx), "=c"(ecx), "=d"(edx): "a"(0));
-	if (ebx == 0x756e6547 && edx == 0x49656e69 && ecx == 0x6c65746e)
-		genuine_intel = 1;
 #if defined(__i386__)
 	asm("popl %ebx;");
 #endif
+	if (ebx == 0x756e6547 && edx == 0x49656e69 && ecx == 0x6c65746e)
+		genuine_intel = 1;
 	if (genuine_intel == 0) {
 		thd_log_warn("Not running on a genuine Intel CPU!\n");
 	}
