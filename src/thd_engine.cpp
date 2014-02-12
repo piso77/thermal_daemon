@@ -34,6 +34,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <sys/types.h>
+#include <cpuid.h>
 #include <locale>
 #include "thd_engine.h"
 #include "thd_cdev_therm_sys_fs.h"
@@ -557,27 +558,14 @@ int cthd_engine::check_cpu_id() {
 	proc_list_matched = false;
 	ebx = ecx = edx = 0;
 
-#if defined(__i386__)
-	/* ebx is a PIC register on i386, so we must not clobber it */
-	asm("pushl %ebx;");
-#endif
-	asm("cpuid": "=a"(max_level), "=b"(ebx), "=c"(ecx), "=d"(edx): "a"(0));
-#if defined(__i386__)
-	asm("popl %ebx;");
-#endif
+	__cpuid(0, max_level, ebx, ecx, edx);
 	if (ebx == 0x756e6547 && edx == 0x49656e69 && ecx == 0x6c65746e)
 		genuine_intel = 1;
 	if (genuine_intel == 0) {
 		// Simply return without further capability check
 		return THD_SUCCESS;
 	}
-#if defined(__i386__)
-	asm("pushl %ebx;");
-#endif
-	asm("cpuid": "=a"(fms), "=c"(ecx), "=d"(edx): "a"(1): "ebx");
-#if defined(__i386__)
-	asm("popl %ebx;");
-#endif
+	__cpuid(1, fms, ebx, ecx, edx);
 	family = (fms >> 8) & 0xf;
 	model = (fms >> 4) & 0xf;
 	stepping = fms & 0xf;
