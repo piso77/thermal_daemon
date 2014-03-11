@@ -154,8 +154,16 @@ int cthd_engine::thd_engine_start(bool ignore_cpuid_check) {
 		thd_log_error("Thermal sysfs: pipe creation failed %d:\n", ret);
 		return THD_FATAL_ERROR;
 	}
-	fcntl(wake_fds[0], F_SETFL, O_NONBLOCK);
-	fcntl(wake_fds[1], F_SETFL, O_NONBLOCK);
+	if (fcntl(wake_fds[0], F_SETFL, O_NONBLOCK) < 0) {
+		thd_log_error("Cannot set non-blocking on pipe: %s\n",
+			strerror(errno));
+		return THD_FATAL_ERROR;
+	}
+	if (fcntl(wake_fds[1], F_SETFL, O_NONBLOCK) < 0) {
+		thd_log_error("Cannot set non-blocking on pipe: %s\n",
+			strerror(errno));
+		return THD_FATAL_ERROR;
+	}
 	write_pipe_fd = wake_fds[1];
 	wakeup_fd = THD_NUM_OF_POLL_FDS - 1;
 
@@ -444,14 +452,8 @@ void cthd_engine::takeover_thermal_control() {
 
 				i = atoi(entry->d_name + strlen("thermal_zone"));
 				std::stringstream policy;
-				std::stringstream type;
-				std::string type_val;
 				std::string curr_policy;
 
-				type << "thermal_zone" << i << "/type";
-				if (sysfs.exists(type.str().c_str())) {
-					sysfs.read(type.str(), type_val);
-				}
 				policy << "thermal_zone" << i << "/policy";
 				if (sysfs.exists(policy.str().c_str())) {
 					sysfs.read(policy.str(), curr_policy);
@@ -487,13 +489,7 @@ void cthd_engine::giveup_thermal_control() {
 
 				i = atoi(entry->d_name + strlen("thermal_zone"));
 				std::stringstream policy;
-				std::stringstream type;
-				std::string type_val;
 
-				type << "thermal_zone" << i << "/type";
-				if (sysfs.exists(type.str().c_str())) {
-					sysfs.read(type.str(), type_val);
-				}
 				policy << "thermal_zone" << i << "/policy";
 				if (sysfs.exists(policy.str().c_str())) {
 					sysfs.write(policy.str(), zone_preferences[cnt++]);
@@ -573,7 +569,7 @@ int cthd_engine::check_cpu_id() {
 		model += ((fms >> 16) & 0xf) << 4;
 
 	thd_log_warn(
-			"%d CPUID levels; family:model:stepping 0x%x:%x:%x (%d:%d:%d)\n",
+			"%u CPUID levels; family:model:stepping 0x%x:%x:%x (%u:%u:%u)\n",
 			max_level, family, model, stepping, family, model, stepping);
 
 	while (id_table[i].family) {
@@ -609,8 +605,10 @@ void cthd_engine::thd_read_default_thermal_sensors() {
 				i = atoi(entry->d_name + strlen("thermal_zone"));
 				cthd_sensor *sensor = new cthd_sensor(i,
 						base_path + entry->d_name + "/", "");
-				if (sensor->sensor_update() != THD_SUCCESS)
+				if (sensor->sensor_update() != THD_SUCCESS) {
+					delete sensor;
 					continue;
+				}
 				sensors.push_back(sensor);
 			}
 		}
@@ -635,8 +633,10 @@ void cthd_engine::thd_read_default_thermal_zones() {
 				i = atoi(entry->d_name + strlen("thermal_zone"));
 				cthd_sysfs_zone *zone = new cthd_sysfs_zone(i,
 						"/sys/class/thermal/thermal_zone");
-				if (zone->zone_update() != THD_SUCCESS)
+				if (zone->zone_update() != THD_SUCCESS) {
+					delete zone;
 					continue;
+				}
 				if (control_mode == EXCLUSIVE)
 					zone->set_zone_active();
 				zones.push_back(zone);
@@ -664,8 +664,10 @@ void cthd_engine::thd_read_default_cooling_devices() {
 				i = atoi(entry->d_name + strlen("cooling_device"));
 				cthd_sysfs_cdev *cdev = new cthd_sysfs_cdev(i,
 						"/sys/class/thermal/");
-				if (cdev->update() != THD_SUCCESS)
+				if (cdev->update() != THD_SUCCESS) {
+					delete cdev;
 					continue;
+				}
 				cdevs.push_back(cdev);
 			}
 		}
@@ -719,7 +721,7 @@ cthd_sensor* cthd_engine::search_sensor(std::string name) {
 }
 
 cthd_sensor* cthd_engine::get_sensor(int index) {
-	if (index < (int) sensors.size())
+	if (index >= 0 && index < (int) sensors.size())
 		return sensors[index];
 	else
 		return NULL;
@@ -728,7 +730,7 @@ cthd_sensor* cthd_engine::get_sensor(int index) {
 cthd_zone* cthd_engine::get_zone(int index) {
 	if (index == -1)
 		return NULL;
-	if (index < (int) zones.size())
+	if (index >= 0 && index < (int) zones.size())
 		return zones[index];
 	else
 		return NULL;
