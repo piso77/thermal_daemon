@@ -53,6 +53,7 @@ cthd_engine::cthd_engine() :
 	thd_attr = pthread_attr_t();
 	thd_cond_var = pthread_cond_t();
 	thd_cond_mutex = pthread_mutex_t();
+	memset(poll_fds, 0, sizeof(poll_fds));
 }
 
 cthd_engine::~cthd_engine() {
