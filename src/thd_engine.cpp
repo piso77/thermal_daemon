@@ -54,6 +54,7 @@ cthd_engine::cthd_engine() :
 	thd_cond_var = pthread_cond_t();
 	thd_cond_mutex = pthread_mutex_t();
 	memset(poll_fds, 0, sizeof(poll_fds));
+	memset(last_cpu_update, 0, sizeof(last_cpu_update));
 }
 
 cthd_engine::~cthd_engine() {
@@ -81,6 +82,9 @@ void cthd_engine::thd_engine_thread() {
 	for (;;) {
 		if (terminate)
 			break;
+
+		rapl_power_meter.rapl_measure_power();
+
 		n = poll(poll_fds, THD_NUM_OF_POLL_FDS, poll_timeout_msec);
 		thd_log_debug("poll exit %d \n", n);
 		if (n < 0) {

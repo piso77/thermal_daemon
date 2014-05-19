@@ -53,7 +53,9 @@ int cthd_cdev_cpufreq::init() {
 			return THD_ERROR;
 
 		std::istringstream(token2) >> cpu_end_index;
-
+		if ((cpu_end_index <= 0) || (cpu_end_index < cpu_start_index)
+				|| cpu_end_index > 63)
+			return THD_ERROR;
 	} else {
 		return THD_ERROR;
 	}
