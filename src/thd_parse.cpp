@@ -42,16 +42,6 @@ void cthd_parse::string_trim(std::string &str) {
 	}
 }
 
-#ifdef ANDROID
-// Very simple version just checking for 0x20 not other white space chars
-bool isspace(int c) {
-	if (c == ' ')
-		return true;
-	else
-		return false;
-}
-#endif
-
 char *cthd_parse::char_trim(char *str) {
 	int i;
 
@@ -70,9 +60,8 @@ char *cthd_parse::char_trim(char *str) {
 
 cthd_parse::cthd_parse() :
 		matched_thermal_info_index(-1), doc(NULL), root_element(NULL) {
-	std::string name_conf = TDCONFDIR;
 	std::string name_run = TDRUNDIR;
-	filename = name_conf + "/" + "thermal-conf.xml";
+	filename = name_run + "/" + "thermal-conf.xml";
 	filename_auto = name_run + "/" + "thermal-conf.xml.auto";
 }
 
@@ -720,6 +709,15 @@ bool cthd_parse::platform_matched() {
 				thd_log_info("Product Name matched \n");
 				return true;
 			}
+		}
+	}
+	for (unsigned int i = 0; i < thermal_info_list.size(); ++i) {
+		if (!thermal_info_list[i].uuid.size())
+			continue;
+		if (!thermal_info_list[i].product_name.compare(0, 1, "*")) {
+			matched_thermal_info_index = i;
+			thd_log_info("Product Name matched \n");
+			return true;
 		}
 	}
 
