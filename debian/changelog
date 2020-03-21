@@ -1,3 +1,9 @@
+thermald (1.9.1-1build1) focal; urgency=medium
+
+  * No-change rebuild for libgcc-s1 package name change.
+
+ -- Matthias Klose <doko@ubuntu.com>  Sat, 21 Mar 2020 13:29:32 +0100
+
 thermald (1.9.1-1) unstable; urgency=medium
 
   * sync with latest upstream release 1.9.1
