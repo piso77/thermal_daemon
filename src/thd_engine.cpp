@@ -580,6 +580,15 @@ void cthd_engine::takeover_thermal_control() {
 						sysfs.write(mode.str(), "enabled");
 					}
 				}
+				type << "thermal_zone" << i << "/type";
+				if (sysfs.exists(type.str().c_str())) {
+					sysfs.read(type.str(), thermal_type);
+					thd_log_info("Thermal zone of type %s\n", thermal_type.c_str());
+					if (thermal_type == "INT3400") {
+						mode << "thermal_zone" << i << "/mode";
+						sysfs.write(mode.str(), "enabled");
+					}
+				}
 			}
 		}
 		closedir(dir);
