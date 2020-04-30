@@ -1,3 +1,9 @@
+thermald (1.9.1-1ubuntu0.1) focal; urgency=medium
+
+  * Intel Tiger Lake support (LP: #1876066)
+
+ -- Alex Tu <alex.tu@canonical.com>  Thu, 30 Apr 2020 18:16:16 +0800
+
 thermald (1.9.1-1build1) focal; urgency=medium
 
   * No-change rebuild for libgcc-s1 package name change.
