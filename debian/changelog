@@ -1,3 +1,11 @@
+thermald (2.1-1) unstable; urgency=medium
+
+  * sync with latest upstream release 2.1
+  * Add autoconf-archive to Build-Depends
+  * Add debhelper-compat (=12), remove debian/compat
+
+ -- Colin King <colin.king@canonical.com>  Tue, 12 May 2020 11:01:23 +0100
+
 thermald (1.9.1-1ubuntu1) groovy; urgency=medium
 
   * Intel Tiger Lake support (LP: #1876066)
