@@ -41,6 +41,7 @@ protected:
 	std::string type_str;
 	bool async_capable;
 	bool virtual_sensor;
+	bool temp_unreadable;
 
 private:
 	std::vector<int> thresholds;
