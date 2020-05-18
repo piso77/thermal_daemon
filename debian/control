@@ -1,7 +1,8 @@
 Source: thermald
 Section: admin
 Priority: optional
-Maintainer: Colin King <colin.king@canonical.com>
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+XSBC-Original-Maintainer: Colin King <colin.king@canonical.com>
 Standards-Version: 4.1.2
 Build-Depends: debhelper (>= 12), quilt, autoconf, libglib2.0-dev, libdbus-1-dev, libdbus-glib-1-dev, libxml2-dev
 Homepage: https://github.com/01org/thermal_daemon

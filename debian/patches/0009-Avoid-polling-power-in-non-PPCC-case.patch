@@ -1,0 +1,27 @@
+From f7db434293387c965e8d9141608f855893740e3a Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 24 Apr 2020 10:55:46 -0700
+Subject: [PATCH] Avoid polling power in non PPCC case
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+There is regression, which is causing polling on non DPTF systems.
+Avoid that.
+---
+ src/thd_cdev_rapl.cpp | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+Index: thermald-1.9.1/src/thd_cdev_rapl.cpp
+===================================================================
+--- thermald-1.9.1.orig/src/thd_cdev_rapl.cpp
++++ thermald-1.9.1/src/thd_cdev_rapl.cpp
+@@ -316,8 +316,7 @@ int cthd_sysfs_cdev_rapl::update() {
+ 		phy_max = rapl_read_pl1_max();
+ 
+ 		// Check if there is any sane max power limit set
+-		if (cdev_sysfs.read(temp_str.str(), &phy_max) < 0 || phy_max < 0
+-				|| phy_max > rapl_max_sane_phy_max) {
++		if (phy_max < 0 || phy_max > rapl_max_sane_phy_max) {
+ 			thd_log_info("%s:powercap RAPL invalid max power limit range \n",
+ 					domain_name.c_str());
+ 			thd_log_info("Calculate dynamically phy_max \n");

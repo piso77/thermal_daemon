@@ -3,3 +3,7 @@
 0004-Remove-processing-when-trip-was-not-activates.patch
 0005-Fix-debug-information-for-cdev.patch
 0006-Tiger-Lake-support.patch
+0007-Restore-to-min-state-on-deactivation-without-dependi.patch
+0008-Clean-up-the-code-and-documentation.patch
+0009-Avoid-polling-power-in-non-PPCC-case.patch
+0010-Ignore-invalid-PPCC-max-power-limit.patch
