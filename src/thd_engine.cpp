@@ -106,7 +106,7 @@ void cthd_engine::thd_engine_thread() {
 
 		if (n == 0 || (tm - thz_last_temp_ind_time) >= poll_timeout_sec) {
 			if (!status) {
-				thd_log_warn("Thermal Daemon is disabled \n");
+				thd_log_msg("Thermal Daemon is disabled \n");
 				continue;
 			}
 			pthread_mutex_lock(&thd_engine_mutex);
@@ -183,9 +183,9 @@ int cthd_engine::thd_engine_start(bool ignore_cpuid_check) {
 
 		if (!proc_list_matched) {
 			if ((parser_init() == THD_SUCCESS) && parser.platform_matched()) {
-				thd_log_warn("Unsupported cpu model, using thermal-conf.xml only \n");
+				thd_log_msg("Unsupported cpu model, using thermal-conf.xml only \n");
 			} else {
-				thd_log_warn("Unsupported cpu model, use thermal-conf.xml file or run with --ignore-cpuid-check \n");
+				thd_log_msg("Unsupported cpu model, use thermal-conf.xml file or run with --ignore-cpuid-check \n");
 				return THD_FATAL_ERROR;
 			}
 		}
@@ -219,7 +219,7 @@ int cthd_engine::thd_engine_start(bool ignore_cpuid_check) {
 
 	poll_timeout_msec = -1;
 	if (poll_interval_sec) {
-		thd_log_warn("Polling mode is enabled: %d\n", poll_interval_sec);
+		thd_log_msg("Polling mode is enabled: %d\n", poll_interval_sec);
 		poll_timeout_msec = poll_interval_sec * 1000;
 	}
 
@@ -263,7 +263,7 @@ int cthd_engine::thd_engine_start(bool ignore_cpuid_check) {
 			if (!zone->zone_active_status())
 				continue;
 			if (!zone->check_sensor_async_status()) {
-				thd_log_warn(
+				thd_log_msg(
 						"Polling will be enabled as some sensors are not capable to notify asynchronously\n");
 				poll_timeout_msec = def_poll_interval;
 				break;
@@ -367,7 +367,7 @@ void cthd_engine::process_pref_change() {
 	}
 	status = true;
 	if (preference != new_pref) {
-		thd_log_warn("Preference changed \n");
+		thd_log_msg("Preference changed \n");
 	}
 	preference = new_pref;
 	for (unsigned int i = 0; i < zones.size(); ++i) {
@@ -487,7 +487,7 @@ int cthd_engine::proc_message(message_capsul_t *msg) {
 	case WAKEUP:
 		break;
 	case TERMINATE:
-		thd_log_warn("Terminating ...\n");
+		thd_log_msg("Terminating ...\n");
 
 		ret = -1;
 		terminate = true;
@@ -497,7 +497,7 @@ int cthd_engine::proc_message(message_capsul_t *msg) {
 		break;
 	case THERMAL_ZONE_NOTIFY:
 		if (!status) {
-			thd_log_warn("Thermal Daemon is disabled \n");
+			thd_log_msg("Thermal Daemon is disabled \n");
 			break;
 		}
 		thermal_zone_change(msg);
@@ -628,7 +628,7 @@ void cthd_engine::giveup_thermal_control() {
 }
 
 void cthd_engine::process_terminate() {
-	thd_log_warn("terminating on user request ..\n");
+	thd_log_msg("terminating on user request ..\n");
 	giveup_thermal_control();
 }
 
@@ -653,7 +653,7 @@ void cthd_engine::thd_engine_fast_poll_disable(int sensor_id) {
 }
 
 void cthd_engine::thd_engine_reload_zones() {
-	thd_log_warn(" Reloading zones\n");
+	thd_log_msg(" Reloading zones\n");
 	for (unsigned int i = 0; i < zones.size(); ++i) {
 		cthd_zone *zone = zones[i];
 		delete zone;
@@ -731,7 +731,7 @@ int cthd_engine::check_cpu_id() {
 	if (family == 6 || family == 0xf)
 		model += ((fms >> 16) & 0xf) << 4;
 
-	thd_log_warn(
+	thd_log_msg(
 			"%u CPUID levels; family:model:stepping 0x%x:%x:%x (%u:%u:%u)\n",
 			max_level, family, model, stepping, family, model, stepping);
 
@@ -744,7 +744,7 @@ int cthd_engine::check_cpu_id() {
 		i++;
 	}
 	if (!valid) {
-		thd_log_warn(" Need Linux PowerCap sysfs \n");
+		thd_log_msg(" Need Linux PowerCap sysfs \n");
 	}
 
 
