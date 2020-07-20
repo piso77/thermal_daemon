@@ -764,6 +764,17 @@ int cthd_engine::check_cpu_id() {
 		}
 	}
 
+
+	for (std::string path : blocklist_paths) {
+		struct stat s;
+
+		if (!stat(path.c_str(), &s)) {
+			proc_list_matched = false;
+			thd_log_warn("[%s] present: Thermald can't run on this platform\n", path.c_str());
+			break;
+		}
+	}
+
 #endif
 	return THD_SUCCESS;
 }
