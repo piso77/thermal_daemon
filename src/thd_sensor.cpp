@@ -64,17 +64,27 @@ int cthd_sensor::sensor_update() {
 unsigned int cthd_sensor::read_temperature() {
 	csys_fs sysfs;
 	std::string buffer;
-	int temp;
+	int temp, ret;
 
 	thd_log_debug("read_temperature sensor ID %d\n", index);
+	if (temp_unreadable)
+		return 0;
+
 	if (type == SENSOR_TYPE_THERMAL_SYSFS)
-		sensor_sysfs.read("temp", buffer);
+		ret = sensor_sysfs.read("temp", buffer);
 	else
-		sensor_sysfs.read("", buffer);
-	std::istringstream(buffer) >> temp;
-	if (temp < 0)
-		temp = 0;
-	thd_log_debug("Sensor %s :temp %u \n", type_str.c_str(), temp);
+		ret = sensor_sysfs.read("", buffer);
+
+	if (ret == 0) {
+		std::istringstream(buffer) >> temp;
+		if (temp < 0)
+			temp = 0;
+	} else {
+		thd_log_info("Sensor %s: cannot read temp, defaulting to 0\n", type_str.c_str());
+		temp_unreadable = true;
+		return 0;
+	}
+	thd_log_debug("Sensor %s: temp %u \n", type_str.c_str(), temp);
 	return (unsigned int)temp / scale;
 }
 
