@@ -7,3 +7,4 @@
 0008-Clean-up-the-code-and-documentation.patch
 0009-Avoid-polling-power-in-non-PPCC-case.patch
 0010-Ignore-invalid-PPCC-max-power-limit.patch
+0011-Added-Cometlake-and-Rocketlake-CPU-models.patch

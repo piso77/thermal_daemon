@@ -1,3 +1,11 @@
+thermald (1.9.1-1ubuntu0.3) focal; urgency=medium
+
+  * Add Cometlake and Rocketlake CPU models (LP: #1896419)
+    [Srinivas Pandruvada]
+    - 7f2003ee911d Added Cometlake and Rocketlake CPU models
+
+ -- Colin King <colin.king@canonical.com>  Mon, 21 Sep 2020 16:04:11 +0100
+
 thermald (1.9.1-1ubuntu0.2) focal; urgency=medium
 
   * Performance workaround for Dell 7390 2-in-1 Ice Lake (LP: #1874933)
