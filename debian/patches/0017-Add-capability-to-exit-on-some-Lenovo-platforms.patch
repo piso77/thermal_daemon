@@ -1,0 +1,38 @@
+From cbda188fa84b722e4a5a4d00672e5805f263d560 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Mon, 20 Jul 2020 08:51:10 -0700
+Subject: [PATCH 17/31] Add capability to exit on some Lenovo platforms
+
+Based on the presence of sysfs path, disable thermald on some platforms.
+
+(cherry picked from commit c222287bb845ef17d7265fc79fa4c5665f8929ac)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine.cpp | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/src/thd_engine.cpp b/src/thd_engine.cpp
+index cc99455..cc28d4b 100644
+--- a/src/thd_engine.cpp
++++ b/src/thd_engine.cpp
+@@ -771,6 +771,17 @@ int cthd_engine::check_cpu_id() {
+ 		}
+ 	}
+ 
++
++	for (std::string path : blocklist_paths) {
++		struct stat s;
++
++		if (!stat(path.c_str(), &s)) {
++			proc_list_matched = false;
++			thd_log_warn("[%s] present: Thermald can't run on this platform\n", path.c_str());
++			break;
++		}
++	}
++
+ #endif
+ 	return THD_SUCCESS;
+ }
+-- 
+2.27.0
+

@@ -1,0 +1,30 @@
+From 307c94ee5833c35999be12c49b26a026b0814e8f Mon Sep 17 00:00:00 2001
+From: Benjamin Berg <bberg@redhat.com>
+Date: Thu, 10 Dec 2020 11:37:27 +0100
+Subject: [PATCH 31/31] adaptive: Remove useless NULL check
+
+_zone cannot be NULL in update_engine_state. Remove a useless check that
+would have caused a crash earlier already.
+
+(cherry picked from commit 268349088e0931421da65f4dce6997f197a10b12)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 6cf1eb7..6575c70 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -1453,7 +1453,7 @@ void cthd_engine_adaptive::update_engine_state() {
+ 				_zone->zone_reset(1);
+ 				_zone->trip_delete_all();
+ 
+-				if (_zone && _zone->zone_active_status())
++				if (_zone->zone_active_status())
+ 					_zone->set_zone_inactive();
+ 			}
+ 
+-- 
+2.27.0
+

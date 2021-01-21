@@ -1,0 +1,43 @@
+From df489a9c94e577ccef54d43ee2fd6f2870531a1e Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Mon, 30 Nov 2020 18:08:43 -0800
+Subject: [PATCH 27/31] Use TCPU cooling device as B0D4
+
+The firmware node path name is changed from B0D4 to TCPU on two different Tiger Lake
+laptops including Dell XPS 13. So add a change for TCPU to refer to B0D4.
+
+We need better mechanism for such firmware name changes. But that will take sometime
+to implement. Meanwhile provide a simple change.
+
+(cherry picked from commit 4fc0e6e7cc836fb2d8f2adff43453548adc110df)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index bf7a346..17ba0d3 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -1164,9 +1164,16 @@ int cthd_engine_adaptive::install_passive(struct psv *psv) {
+ 	cthd_cdev *cdev = search_cdev(psv_cdev);
+ 
+ 	if (!cdev) {
+-		thd_log_warn("Unable to find a cooling device for %s\n",
++		if (!psv_cdev.compare(0, 4, "TCPU")) {
++			psv_cdev= "B0D4";
++			cdev = search_cdev(psv_cdev);
++		}
++
++		if (!cdev) {
++			thd_log_warn("Unable to find a cooling device for %s\n",
+ 				psv_cdev.c_str());
+-		return THD_ERROR;
++			return THD_ERROR;
++		}
+ 	}
+ 
+ 	cthd_sensor *sensor = search_sensor(psv_zone);
+-- 
+2.27.0
+

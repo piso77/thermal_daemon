@@ -1,0 +1,38 @@
+From 7efcc15ea6a01060a3497f98811e943a31cf5812 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sat, 11 Apr 2020 16:21:10 -0700
+Subject: [PATCH 10/31] Enable and disable the INT3400 thermal zone
+
+The firmware doesn't pay attention to the configured UUID in the INT3400
+device until _OSC is called, and this only happens when we enable the
+associated thermal zone. Make sure we do so, and disable it again on exit.
+
+(cherry picked from commit 86ab619cfbfb749b26b9f0e9d07fd32f356724fe)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine.cpp | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/src/thd_engine.cpp b/src/thd_engine.cpp
+index 562c49e..cc99455 100644
+--- a/src/thd_engine.cpp
++++ b/src/thd_engine.cpp
+@@ -580,6 +580,15 @@ void cthd_engine::takeover_thermal_control() {
+ 						sysfs.write(mode.str(), "enabled");
+ 					}
+ 				}
++				type << "thermal_zone" << i << "/type";
++				if (sysfs.exists(type.str().c_str())) {
++					sysfs.read(type.str(), thermal_type);
++					thd_log_info("Thermal zone of type %s\n", thermal_type.c_str());
++					if (thermal_type == "INT3400") {
++						mode << "thermal_zone" << i << "/mode";
++						sysfs.write(mode.str(), "enabled");
++					}
++				}
+ 			}
+ 		}
+ 		closedir(dir);
+-- 
+2.27.0
+

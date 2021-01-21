@@ -1,0 +1,29 @@
+From 68949207af8f052f62951a8e881ad2da8333ce20 Mon Sep 17 00:00:00 2001
+From: Benjamin Berg <bberg@redhat.com>
+Date: Thu, 10 Dec 2020 11:35:46 +0100
+Subject: [PATCH 29/31] adaptive: Fix missing initializer
+
+The limit_1_valid attribute was not initialized to zero.
+
+(cherry picked from commit d51e3d5f78ac0d90d3bf247f1fb61a53fa3b5a71)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index fa7381d..38d5098 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -496,6 +496,8 @@ int cthd_engine_adaptive::parse_ppcc(char *name, char *buf, int len) {
+ 	if (ppcc.power_limit_1_max && ppcc.power_limit_1_min && ppcc.time_wind_1_min
+ 			&& ppcc.time_wind_1_max && ppcc.step_1_size)
+ 		ppcc.limit_1_valid = 1;
++	else
++		ppcc.limit_1_valid = 0;
+ 
+ 	ppccs.push_back(ppcc);
+ 
+-- 
+2.27.0
+

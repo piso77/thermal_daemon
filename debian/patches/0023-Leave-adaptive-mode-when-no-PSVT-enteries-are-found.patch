@@ -1,0 +1,86 @@
+From 6ad30c40ee51c4e3e7525f333ddb13549a0637ef Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 20 Nov 2020 11:15:36 -0800
+Subject: [PATCH 23/31] Leave adaptive mode when no PSVT enteries are found
+
+When no PSVT enteries are found because of some missing sensors,
+there is no point in continue in adaptive mode.
+In this case exit by creating a file in tmp file system, so that
+systemd will start thermald in non-adaptive mode.
+
+Also when there are no adaptive condition table enteries, also
+exit adaptive mode.
+
+(cherry picked from commit a59701fce0017b0c43f45d3d1aaf9b4cc476ec74)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 2be02dc..024ed5f 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -1344,10 +1344,21 @@ void cthd_engine_adaptive::set_int3400_target(struct adaptive_target target) {
+ 		}
+ 
+ 		thd_log_info("\n\n ZONE DUMP BEGIN\n");
++		int new_zone_count = 0;
+ 		for (unsigned int i = 0; i < zones.size(); ++i) {
+ 			zones[i]->zone_dump();
++			if (zones[i]->zone_active_status())
++				++new_zone_count;
+ 		}
+ 		thd_log_info("\n\n ZONE DUMP END\n");
++		if (!new_zone_count) {
++			thd_log_warn("Adaptive policy couldn't create any zones\n");
++			thd_log_warn("Possibly some sensors in the PSVT are missing\n");
++			thd_log_warn("Restart in non adaptive mode via systemd\n");
++			csys_fs sysfs("/tmp/ignore_adaptive");
++			sysfs.create();
++			exit(EXIT_FAILURE);
++		}
+ 
+ 	}
+ 	if (target.code == "PSV") {
+@@ -1366,6 +1377,13 @@ void cthd_engine_adaptive::execute_target(struct adaptive_target target) {
+ 	else
+ 		name = target.participant.substr(pos + 1);
+ 	cdev = search_cdev(name);
++	if (!cdev) {
++		if (!name.compare(0, 4, "TCPU")) {
++			name = "B0D4";
++			cdev = search_cdev(name);
++		}
++	}
++
+ 	thd_log_info("looking for cdev %s\n", name.c_str());
+ 	if (!cdev) {
+ 		thd_log_info("cdev %s not found\n", name.c_str());
+@@ -1485,6 +1503,11 @@ int cthd_engine_adaptive::thd_engine_start(bool ignore_cpuid_check) {
+ 	csys_fs sysfs("/sys/");
+ 	size_t size;
+ 
++	csys_fs _sysfs("/tmp/ignore_adaptive");
++	if (_sysfs.exists()) {
++		return THD_ERROR;
++	}
++
+ 	parser_disabled = true;
+ 	force_mmio_rapl = true;
+ 
+@@ -1532,6 +1555,11 @@ int cthd_engine_adaptive::thd_engine_start(bool ignore_cpuid_check) {
+ 		return THD_FATAL_ERROR;
+ 	}
+ 
++	if (!conditions.size()) {
++		thd_log_info("No adaptive conditions present\n");
++		return THD_ERROR;
++	}
++
+ 	setup_input_devices();
+ 
+ 	upower_client = up_client_new();
+-- 
+2.27.0
+
