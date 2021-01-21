@@ -1,0 +1,75 @@
+From 94bad5dfc4bbd662d27aff7e1d37872dac45d237 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 24 Jul 2020 13:32:28 -0700
+Subject: [PATCH 057/134] Remove memory leak on zone delete
+
+Normally zone is deleted during exit, but for dynamic zone
+creation they can be deleted and recreated. There is cdev
+vector in trip. So when all trip points are cleared, make
+sure that the vector is cleared.
+
+Also add new interface to delete all trips.
+
+(cherry picked from commit 5ba79d63c50455a2e1136bd09ffd324969746fc6)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit e427f6ab0cdf557a1b602819c7208e5bb11b86c4)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_trip_point.h |  4 ++++
+ src/thd_zone.cpp     |  3 +++
+ src/thd_zone.h       | 10 ++++++++++
+ 3 files changed, 17 insertions(+)
+
+diff --git a/src/thd_trip_point.h b/src/thd_trip_point.h
+index 89eb083..4331559 100644
+--- a/src/thd_trip_point.h
++++ b/src/thd_trip_point.h
+@@ -111,6 +111,10 @@ public:
+ 			int target_state =
+ 			TRIP_PT_INVALID_TARGET_STATE, pid_param_t *pid_param = NULL);
+ 
++	void delete_cdevs() {
++		cdevs.clear();
++	}
++
+ 	void thd_trip_cdev_state_reset();
+ 	int thd_trip_point_value() {
+ 		return temp;
+diff --git a/src/thd_zone.cpp b/src/thd_zone.cpp
+index eb81d61..b518f61 100644
+--- a/src/thd_zone.cpp
++++ b/src/thd_zone.cpp
+@@ -42,6 +42,9 @@ cthd_zone::cthd_zone(int _index, std::string control_path, sensor_relate_t rel)
+ }
+ 
+ cthd_zone::~cthd_zone() {
++	for (unsigned int i = 0; i < trip_points.size(); ++i) {
++		trip_points[i].delete_cdevs();
++	}
+ 	trip_points.clear();
+ 	sensors.clear();
+ }
+diff --git a/src/thd_zone.h b/src/thd_zone.h
+index 67e2992..52ee26a 100644
+--- a/src/thd_zone.h
++++ b/src/thd_zone.h
+@@ -175,6 +175,16 @@ public:
+ 			return NULL;
+ 	}
+ 
++	void trip_delete_all() {
++		if (!trip_points.size())
++			return;
++
++		for (unsigned int i = 0; i < trip_points.size(); ++i) {
++			trip_points[i].delete_cdevs();
++		}
++		trip_points.clear();
++	}
++
+ 	void zone_dump() {
+ 		if (!zone_active)
+ 			return;
+-- 
+2.27.0
+

@@ -1,0 +1,33 @@
+From 407c30ff3bf8455cb030b825e33343bda6697fbe Mon Sep 17 00:00:00 2001
+From: Benjamin Berg <bberg@redhat.com>
+Date: Thu, 9 Jul 2020 15:29:22 +0200
+Subject: [PATCH 021/134] sys_fs: Clearly specify csys_fs::create in log
+ message
+
+Just writing "open" makes the message identical to other failures of
+opening sysfs attributes.
+
+(cherry picked from commit 9d5768b59da4a5892e141d2288bcaef13c14f1de)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit b80f0ea9d1353340e7213324fdfdfea2cb862f39)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_sys_fs.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/thd_sys_fs.cpp b/src/thd_sys_fs.cpp
+index c5db5ba..d5b1c05 100644
+--- a/src/thd_sys_fs.cpp
++++ b/src/thd_sys_fs.cpp
+@@ -184,7 +184,7 @@ int csys_fs::create() {
+ 
+ 	int fd = ::open(base_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRWXU);
+ 	if (fd < 0) {
+-		thd_log_warn("sysfs open failed %s\n", base_path.c_str());
++		thd_log_warn("sysfs create failed %s\n", base_path.c_str());
+ 		return -errno;
+ 	}
+ 	close(fd);
+-- 
+2.27.0
+

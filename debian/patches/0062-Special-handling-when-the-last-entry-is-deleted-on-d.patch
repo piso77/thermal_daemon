@@ -1,0 +1,47 @@
+From 18bb19ff48b6028910eb8e9d0ec9c001ecf78664 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Wed, 29 Jan 2020 06:14:22 -0800
+Subject: [PATCH 062/134] Special handling when the last entry is deleted on
+ deactivation
+
+When a device is deactivated, the entry is deleted from the list.
+But the stepwise deactivation still goes on. But while the device
+is still in the process to reach min_state, if another trip
+activates the same device again, it should take precedence.
+In this way it is not limited by the current state.
+
+(cherry picked from commit 88e6c0ba3b09324f5c733dbd612c79aeb013f9a7)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 26ec796b132e01cce1c86ffa50a2920ce465e955)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_cdev.cpp | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/src/thd_cdev.cpp b/src/thd_cdev.cpp
+index 7934cd4..2f91e01 100644
+--- a/src/thd_cdev.cpp
++++ b/src/thd_cdev.cpp
+@@ -213,6 +213,10 @@ int cthd_cdev::thd_cdev_set_state(int set_point, int target_temp,
+ 
+ 	if (state) {
+ 		bool found = false;
++		bool first_entry = false;
++
++		if (zone_trip_limits.size() == 0)
++			first_entry = true;
+ 
+ 		// Search for the zone and trip id in the list
+ 		for (unsigned int i = 0; i < zone_trip_limits.size(); ++i) {
+@@ -251,7 +255,7 @@ int cthd_cdev::thd_cdev_set_state(int set_point, int target_temp,
+ 		limit = zone_trip_limits[zone_trip_limits.size() - 1];
+ 		target_value = limit.target_value;
+ 		target_state_valid = limit.target_state_valid;
+-		if (target_state_valid
++		if (!first_entry && target_state_valid
+ 				&& cmp_current_state(
+ 						map_target_state(target_state_valid, target_value))
+ 						<= 0) {
+-- 
+2.27.0
+

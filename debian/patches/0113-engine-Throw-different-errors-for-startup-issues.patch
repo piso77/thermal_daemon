@@ -1,0 +1,104 @@
+From ec69291910abe934b0d843636f7d816d7939f041 Mon Sep 17 00:00:00 2001
+From: Benjamin Berg <bberg@redhat.com>
+Date: Thu, 1 Oct 2020 11:37:06 +0200
+Subject: [PATCH 113/134] engine: Throw different errors for startup issues
+
+Some errors such as an unsupported CPU are expected to happen. Throw
+THD_ERROR for those and THD_FATAL_ERROR in all other cases.
+
+(cherry picked from commit d010b6fdfc7c2556adf9fcd1a4f61f2da9d57d40)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 168a4409d13d4929bb0bdc9162605b81efc88cf6)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine.cpp          |  2 +-
+ src/thd_engine_adaptive.cpp |  8 ++++----
+ src/thd_engine_default.cpp  | 12 ++++++++----
+ 3 files changed, 13 insertions(+), 9 deletions(-)
+
+diff --git a/src/thd_engine.cpp b/src/thd_engine.cpp
+index 68eb45f..5a7390f 100644
+--- a/src/thd_engine.cpp
++++ b/src/thd_engine.cpp
+@@ -186,7 +186,7 @@ int cthd_engine::thd_engine_start(bool ignore_cpuid_check) {
+ 				thd_log_msg("Unsupported cpu model, using thermal-conf.xml only \n");
+ 			} else {
+ 				thd_log_msg("Unsupported cpu model, use thermal-conf.xml file or run with --ignore-cpuid-check \n");
+-				return THD_FATAL_ERROR;
++				return THD_ERROR;
+ 			}
+ 		}
+ 	}
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 574aee6..3ce1628 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -1480,21 +1480,21 @@ int cthd_engine_adaptive::thd_engine_start(bool ignore_cpuid_check) {
+ 	buf = new char[size];
+ 	if (!buf) {
+ 		thd_log_error("Unable to allocate memory for GDDV");
+-		return THD_ERROR;
++		return THD_FATAL_ERROR;
+ 	}
+ 
+ 	if (sysfs.read("bus/platform/devices/INT3400:00/data_vault", buf, size)
+ 			< int(size)) {
+ 		thd_log_debug("Unable to read GDDV data vault\n");
+ 		delete[] buf;
+-		return THD_ERROR;
++		return THD_FATAL_ERROR;
+ 	}
+ 
+ 	try {
+ 		if (parse_gddv(buf, size, NULL)) {
+ 			thd_log_debug("Unable to parse GDDV");
+ 			delete[] buf;
+-			return THD_ERROR;
++			return THD_FATAL_ERROR;
+ 		}
+ 
+ 		merge_appc();
+@@ -1506,7 +1506,7 @@ int cthd_engine_adaptive::thd_engine_start(bool ignore_cpuid_check) {
+ 	} catch (std::exception &e) {
+ 		thd_log_warn("%s\n", e.what());
+ 		delete [] buf;
+-		return THD_ERROR;
++		return THD_FATAL_ERROR;
+ 	}
+ 
+ 	setup_input_devices();
+diff --git a/src/thd_engine_default.cpp b/src/thd_engine_default.cpp
+index bc426b3..fbe6835 100644
+--- a/src/thd_engine_default.cpp
++++ b/src/thd_engine_default.cpp
+@@ -816,6 +816,7 @@ cthd_engine *thd_engine;
+ 
+ int thd_engine_create_default_engine(bool ignore_cpuid_check,
+ 		bool exclusive_control, const char *conf_file) {
++	int res;
+ 	thd_engine = new cthd_engine_default();
+ 	if (exclusive_control)
+ 		thd_engine->set_control_mode(EXCLUSIVE);
+@@ -825,12 +826,15 @@ int thd_engine_create_default_engine(bool ignore_cpuid_check,
+ 	if (conf_file)
+ 		thd_engine->set_config_file(conf_file);
+ 
+-	if (thd_engine->thd_engine_start(ignore_cpuid_check) != THD_SUCCESS) {
+-		thd_log_error("THD engine start failed\n");
+-		return THD_ERROR;
++	res = thd_engine->thd_engine_start(ignore_cpuid_check);
++	if (res != THD_SUCCESS) {
++		if (res == THD_FATAL_ERROR)
++			thd_log_error("THD engine start failed\n");
++		else
++			thd_log_msg("THD engine start failed\n");
+ 	}
+ 
+-	return THD_SUCCESS;
++	return res;
+ }
+ 
+ void cthd_engine_default::workarounds()
+-- 
+2.27.0
+

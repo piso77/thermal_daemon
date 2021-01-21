@@ -1,0 +1,30 @@
+From 5575832204359b96b4888c7ae1f5ab362bd149f8 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sat, 11 Apr 2020 18:44:13 -0700
+Subject: [PATCH 032/134] Add an error when a compressed GDDV payload is
+ detected.
+
+(cherry picked from commit e70fd48d56ed0a2d6f8f926f70cd18c762bcdcc8)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit e97cbfb1e16cd2e22348c6e9228207aab6a00aa6)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 1b35de1..3af3a20 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -288,6 +288,8 @@ int cthd_engine_adaptive::parse_gddv(char *buf, int size) {
+ 		if (header->version == htonl(2)) {
+ 			memcpy(&unk1, buf + offset, sizeof(unk1));
+ 			offset += sizeof(unk1);
++			if (unk1 == 0x005d)
++				thd_log_fatal("Found unsupported compressed GDDV object\n");
+ 		}
+ 
+ 		memcpy(&keyflags, buf + offset, sizeof(keyflags));
+-- 
+2.27.0
+

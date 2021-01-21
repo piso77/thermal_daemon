@@ -1,0 +1,189 @@
+From cc0d8718050c4b7eea947bca3a92d1cfb014eb9f Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Mon, 13 Apr 2020 00:55:23 -0700
+Subject: [PATCH 047/134] Add support for platform type
+
+Requires that the platform provide a SW_TABLET_MODE switch, so this may not
+be reliable.
+
+(cherry picked from commit 957632b974bb6e7adf329e3bd70a76ab4718f9f4)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit e3e87baab1d85060d56ed8902824ef20939662d0)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ Makefile.am                 |  4 ++-
+ configure.ac                |  2 ++
+ src/thd_engine_adaptive.cpp | 53 +++++++++++++++++++++++++++++++++++++
+ src/thd_engine_adaptive.h   |  4 +++
+ 4 files changed, 62 insertions(+), 1 deletion(-)
+
+diff --git a/Makefile.am b/Makefile.am
+index 73f771d..9ebb850 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -10,6 +10,7 @@ AM_CXXFLAGS = \
+ 	${DBUS_CFLAGS} \
+ 	$(XML_CFLAGS) \
+ 	$(UPOWER_CFLAGS) \
++	$(EVDEV_CFLAGS) \
+ 	-DTDRUNDIR=\"$(tdrundir)\" \
+ 	-DTDCONFDIR=\"$(tdconfdir)\" \
+ 	$(CXXFLAGS) \
+@@ -36,7 +37,8 @@ thermald_LDADD = \
+ 	$(LIBDL) \
+ 	$(XML_LIBS) \
+ 	$(LZMA_LIBS) \
+-	$(UPOWER_LIBS)
++	$(UPOWER_LIBS) \
++	$(EVDEV_LIBS)
+ 
+ BUILT_SOURCES = \
+ 	thd_dbus_interface.h
+diff --git a/configure.ac b/configure.ac
+index adb3685..37b5409 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -74,6 +74,8 @@ PKG_CHECK_MODULES(LZMA, liblzma)
+ 
+ PKG_CHECK_MODULES(UPOWER, upower-glib)
+ 
++PKG_CHECK_MODULES(EVDEV, libevdev)
++
+ AC_PROG_CC
+ AC_PROG_CPP
+ AC_PROG_CXX
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 7370ecf..32d28c7 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -2,6 +2,7 @@
+ #include <dirent.h>
+ #include <errno.h>
+ #include <lzma.h>
++#include <linux/input.h>
+ #include <sys/types.h>
+ #include "thd_engine_adaptive.h"
+ #include "thd_zone_cpu.h"
+@@ -467,6 +468,8 @@ int cthd_engine_adaptive::verify_condition(struct condition condition) {
+ 		return 0;
+ 	if (condition.condition == Workload)
+ 		return 0;
++	if (condition.condition == Platform_type)
++		return 0;
+ 
+ 	thd_log_error("Unsupported condition %d\n", condition.condition);
+ 	return THD_ERROR;
+@@ -578,6 +581,17 @@ int cthd_engine_adaptive::evaluate_workload_condition(struct condition condition
+ 	return compare_condition(condition, 3);
+ }
+ 
++int cthd_engine_adaptive::evaluate_platform_type_condition(struct condition condition) {
++	int value = 1;
++
++	if (tablet_dev) {
++		int tablet = libevdev_get_event_value(tablet_dev, EV_SW, SW_TABLET_MODE);
++		if (tablet)
++			value = 2;
++	}
++	return compare_condition(condition, value);
++}
++
+ int cthd_engine_adaptive::evaluate_ac_condition(struct condition condition) {
+ 	int value = 0;
+ 	bool on_battery = up_client_get_on_battery(upower_client);
+@@ -616,6 +630,10 @@ int cthd_engine_adaptive::evaluate_condition(struct condition condition) {
+ 		return evaluate_workload_condition(condition);
+ 	}
+ 
++	if (condition.condition == Platform_type) {
++		return evaluate_platform_type_condition(condition);
++	}
++
+ 	return THD_ERROR;
+ }
+ 
+@@ -769,6 +787,39 @@ void cthd_engine_adaptive::update_engine_state() {
+ 	}
+ }
+ 
++static int is_event_device(const struct dirent *dir) {
++	return strncmp("event", dir->d_name, 5) == 0;
++}
++
++void cthd_engine_adaptive::setup_input_devices() {
++	struct dirent **namelist;
++	int i, ndev, ret;
++
++	tablet_dev = NULL;
++
++	ndev = scandir("/dev/input", &namelist, is_event_device, versionsort);
++	for (i = 0; i < ndev; i++)
++	{
++		char fname[267];
++		int fd = -1;
++
++		snprintf(fname, sizeof(fname),
++			 "/dev/input/%s", namelist[i]->d_name);
++		fd = open(fname, O_RDONLY);
++		if (fd < 0)
++			continue;
++		ret = libevdev_new_from_fd(fd, &tablet_dev);
++		if (ret) {
++			close(fd);
++			continue;
++		}
++		if (libevdev_has_event_code(tablet_dev, EV_SW, SW_TABLET_MODE))
++			return;
++		libevdev_free(tablet_dev);
++		close(fd);
++	}
++}
++
+ int cthd_engine_adaptive::thd_engine_start(bool ignore_cpuid_check) {
+ 	char *buf;
+ 	csys_fs sysfs("/sys/");
+@@ -805,6 +856,8 @@ int cthd_engine_adaptive::thd_engine_start(bool ignore_cpuid_check) {
+ 		return THD_ERROR;
+ 	}
+ 
++	setup_input_devices();
++
+ 	upower_client = up_client_new();
+ 	if (upower_client == NULL) {
+ 		thd_log_error("Unable to connect to upower\n");
+diff --git a/src/thd_engine_adaptive.h b/src/thd_engine_adaptive.h
+index 6a40011..1ca8ce8 100644
+--- a/src/thd_engine_adaptive.h
++++ b/src/thd_engine_adaptive.h
+@@ -26,6 +26,7 @@
+ #ifndef THD_ENGINE_ADAPTIVE_H_
+ #define THD_ENGINE_ADAPTIVE_H_
+ 
++#include <libevdev/libevdev.h>
+ #include <upower.h>
+ 
+ #include "thd_engine_default.h"
+@@ -149,6 +150,7 @@ protected:
+ 	std::vector<struct psvt> psvts;
+ 	std::string int3400_path;
+ 	UpClient *upower_client;
++	struct libevdev *tablet_dev;
+ 	int get_type(char *object, int *offset);
+ 	uint64_t get_uint64(char *object, int *offset);
+ 	char *get_string(char *object, int *offset);
+@@ -172,10 +174,12 @@ protected:
+ 	int evaluate_ac_condition(struct condition condition);
+ 	int evaluate_lid_condition(struct condition condition);
+ 	int evaluate_workload_condition(struct condition condition);
++	int evaluate_platform_type_condition(struct condition condition);
+ 	int evaluate_condition(struct condition condition);
+ 	int evaluate_condition_set(std::vector<struct condition> condition_set);
+ 	int evaluate_conditions();
+ 	void execute_target(struct adaptive_target target);
++	void setup_input_devices();
+ public:
+ 	cthd_engine_adaptive() :
+ 		cthd_engine_default("63BE270F-1C11-48FD-A6F7-3AF253FF3E2D") {
+-- 
+2.27.0
+

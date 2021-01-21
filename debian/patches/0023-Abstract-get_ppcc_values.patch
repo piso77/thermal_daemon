@@ -1,0 +1,61 @@
+From ca44122e7eda4cc4dad9bed6e1ff838c084d65ed Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Wed, 8 Apr 2020 20:25:26 -0700
+Subject: [PATCH 023/134] Abstract get_ppcc_values
+
+We can obtain PPCC parameters from the firmware, so abstract that rather
+than calling directly into the XML parser code.
+
+(cherry picked from commit 7b20f92f8324cbb4f798f949709849d9ce613c8e)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit ac34742c91b02d5ead821301eba3da8956cc3db2)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_cdev_rapl.cpp | 2 +-
+ src/thd_engine.cpp    | 4 ++++
+ src/thd_engine.h      | 1 +
+ 3 files changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/src/thd_cdev_rapl.cpp b/src/thd_cdev_rapl.cpp
+index d8a5a33..dc8e7c2 100644
+--- a/src/thd_cdev_rapl.cpp
++++ b/src/thd_cdev_rapl.cpp
+@@ -383,7 +383,7 @@ bool cthd_sysfs_cdev_rapl::read_ppcc_power_limits() {
+ 	csys_fs sys_fs;
+ 	ppcc_t *ppcc;
+ 
+-	ppcc = thd_engine->parser.get_ppcc_param();
++	ppcc = thd_engine->get_ppcc_param();
+ 	if (ppcc) {
+ 		int def_max_power;
+ 
+diff --git a/src/thd_engine.cpp b/src/thd_engine.cpp
+index a60b144..63953f4 100644
+--- a/src/thd_engine.cpp
++++ b/src/thd_engine.cpp
+@@ -820,6 +820,10 @@ void cthd_engine::thd_read_default_cooling_devices() {
+ 			cdevs.size());
+ }
+ 
++ppcc_t* cthd_engine::get_ppcc_param() {
++	return parser.get_ppcc_param();
++}
++
+ cthd_zone* cthd_engine::search_zone(std::string name) {
+ 	cthd_zone *zone;
+ 
+diff --git a/src/thd_engine.h b/src/thd_engine.h
+index f2119ca..cd25aff 100644
+--- a/src/thd_engine.h
++++ b/src/thd_engine.h
+@@ -229,6 +229,7 @@ public:
+ 	std::string get_config_file() {
+ 		return config_file;
+ 	}
++	ppcc_t *get_ppcc_param();
+ 	cthd_zone *search_zone(std::string name);
+ 	cthd_cdev *search_cdev(std::string name);
+ 	cthd_sensor *search_sensor(std::string name);
+-- 
+2.27.0
+

@@ -1,0 +1,79 @@
+From cd434132a114a76e6fdccad7c2813ecc98b0e9eb Mon Sep 17 00:00:00 2001
+From: Benjamin Berg <bberg@redhat.com>
+Date: Thu, 9 Jul 2020 15:57:32 +0200
+Subject: [PATCH 081/134] thermald: Add thd_log_msg helper
+
+It is not desirable currently to always print thd_log_info.
+Unfortunately, the first level that will usually be printed are
+warnings, which is too severe for many cases.
+
+Add thd_log_msg, with a severity above info but below warning to resolve
+this.
+
+(cherry picked from commit 55622aa8f9296c1a4b7342ab4f70d0070ffae20a)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 0295eb4864e12c31bc8fe7cc123fecfef2af1736)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/main.cpp   | 7 +++----
+ src/thermald.h | 3 +++
+ 2 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/src/main.cpp b/src/main.cpp
+index c18e801..a0eef09 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -58,7 +58,7 @@ static const char *lock_file = TDRUNDIR "/thermald.pid";
+ 
+ // Default log level
+ static int thd_log_level = G_LOG_LEVEL_ERROR | G_LOG_LEVEL_CRITICAL
+-		| G_LOG_LEVEL_WARNING;
++		| G_LOG_LEVEL_WARNING | G_LOG_LEVEL_MESSAGE;
+ 
+ // Daemonize or not
+ static gboolean thd_daemonize;
+@@ -265,11 +265,10 @@ int main(int argc, char *argv[]) {
+ 	g_mkdir_with_parents(TDCONFDIR, 0755); // Don't care return value as directory
+ 	// may already exist
+ 	if (log_info) {
+-		thd_log_level |= G_LOG_LEVEL_MESSAGE | G_LOG_LEVEL_INFO;
++		thd_log_level |= G_LOG_LEVEL_INFO;
+ 	}
+ 	if (log_debug) {
+-		thd_log_level |= G_LOG_LEVEL_MESSAGE | G_LOG_LEVEL_INFO
+-				| G_LOG_LEVEL_DEBUG;
++		thd_log_level |= G_LOG_LEVEL_INFO | G_LOG_LEVEL_DEBUG;
+ 	}
+ 	if (poll_interval >= 0) {
+ 		fprintf(stdout, "Polling enabled: %d\n", poll_interval);
+diff --git a/src/thermald.h b/src/thermald.h
+index 4ce6164..6588d0a 100644
+--- a/src/thermald.h
++++ b/src/thermald.h
+@@ -50,6 +50,7 @@
+ #define thd_log_fatal	ALOGE
+ #define thd_log_error	ALOGE
+ #define thd_log_warn	ALOGW
++#define thd_log_msg	ALOGI
+ #if LOG_DEBUG_INFO == 1
+ #define thd_log_info	ALOGI
+ #define thd_log_debug 	ALOGD
+@@ -78,6 +79,7 @@
+ #define thd_log_fatal		g_error		// Print error and terminate
+ #define thd_log_error		g_critical
+ #define thd_log_warn		g_warning
++#define thd_log_msg		g_message
+ #define thd_log_debug		g_debug
+ #define thd_log_info(...)	g_log(NULL, G_LOG_LEVEL_INFO, __VA_ARGS__)
+ #else
+@@ -87,6 +89,7 @@ static int dummy_printf(const char *__restrict __format, ...) {
+ #define thd_log_fatal		printf
+ #define thd_log_error		printf
+ #define thd_log_warn		printf
++#define thd_log_msg		printf
+ #define thd_log_debug		dummy_printf
+ #define thd_log_info		printf
+ #endif
+-- 
+2.27.0
+

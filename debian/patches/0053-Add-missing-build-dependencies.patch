@@ -1,0 +1,29 @@
+From b076142ff19d8fe58a187be0bcd2e329f2dcb061 Mon Sep 17 00:00:00 2001
+From: Julian Calaby <julian.calaby@gmail.com>
+Date: Mon, 13 Apr 2020 13:56:31 +1000
+Subject: [PATCH 053/134] Add missing build dependencies
+
+(cherry picked from commit b3070cdf38e0475846fea35d6ac96d0564244f71)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit a45fd9dfce3c0202377c0a035b7fd0d4c26d2be8)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ README.txt | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/README.txt b/README.txt
+index e5965b8..2dfe668 100644
+--- a/README.txt
++++ b/README.txt
+@@ -64,6 +64,8 @@ Building on Ubuntu
+ 	sudo apt-get install libdbus-1-dev
+ 	sudo apt-get install libdbus-glib-1-dev
+ 	sudo apt-get install libxml2-dev
++	sudo apt-get install libupower-glib-dev
++	sudo apt-get install liblzma-dev
+ 
+ 2
+ Build
+-- 
+2.27.0
+

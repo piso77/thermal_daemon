@@ -1,0 +1,142 @@
+From a58b93c8eb3cf11f367a33cef3e946405683d6b8 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sun, 12 Apr 2020 16:55:38 -0700
+Subject: [PATCH 044/134] Add support for reading lid state
+
+This relies on upower, so add a dependency on that as well.
+
+(cherry picked from commit fce9fb92721e1557ccaf7f1a7126ff553fdb5f4f)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 9e92490889cc8b7b185c4828854e060f4ccc46c1)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ Makefile.am                 |  4 +++-
+ configure.ac                |  2 ++
+ src/thd_engine_adaptive.cpp | 25 +++++++++++++++++++++++++
+ src/thd_engine_adaptive.h   |  4 ++++
+ 4 files changed, 34 insertions(+), 1 deletion(-)
+
+diff --git a/Makefile.am b/Makefile.am
+index 5f51e4b..73f771d 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -9,6 +9,7 @@ AM_CFLAGS = ${DBUS_CFLAGS}
+ AM_CXXFLAGS = \
+ 	${DBUS_CFLAGS} \
+ 	$(XML_CFLAGS) \
++	$(UPOWER_CFLAGS) \
+ 	-DTDRUNDIR=\"$(tdrundir)\" \
+ 	-DTDCONFDIR=\"$(tdconfdir)\" \
+ 	$(CXXFLAGS) \
+@@ -34,7 +35,8 @@ thermald_LDADD = \
+ 	$(LIBM) \
+ 	$(LIBDL) \
+ 	$(XML_LIBS) \
+-	$(LZMA_LIBS)
++	$(LZMA_LIBS) \
++	$(UPOWER_LIBS)
+ 
+ BUILT_SOURCES = \
+ 	thd_dbus_interface.h
+diff --git a/configure.ac b/configure.ac
+index 481a012..adb3685 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -72,6 +72,8 @@ PKG_CHECK_MODULES(XML, libxml-2.0 >= 2.4)
+ 
+ PKG_CHECK_MODULES(LZMA, liblzma)
+ 
++PKG_CHECK_MODULES(UPOWER, upower-glib)
++
+ AC_PROG_CC
+ AC_PROG_CPP
+ AC_PROG_CXX
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 98cf9a5..1c191af 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -456,6 +456,13 @@ int cthd_engine_adaptive::verify_condition(struct condition condition) {
+ 		return 0;
+ 	if (condition.condition == Default)
+ 		return 0;
++	if (condition.condition == Temperature ||
++	    condition.condition == Temperature_without_hysteresis ||
++	    condition.condition == (adaptive_condition)0) {
++		return 0;
++	}
++	if (condition.condition == Lid_state && upower_client != NULL)
++		return 0;
+ 
+ 	thd_log_error("Unsupported condition %d\n", condition.condition);
+ 	return THD_ERROR;
+@@ -550,6 +557,15 @@ int cthd_engine_adaptive::evaluate_temperature_condition(struct condition condit
+ 	return  compare_condition(condition, value);
+ }
+ 
++int cthd_engine_adaptive::evaluate_lid_condition(struct condition condition) {
++	int value = 0;
++	bool lid_closed = up_client_get_lid_is_closed (upower_client);
++
++	if (!lid_closed)
++		value = 1;
++
++	return compare_condition(condition, value);
++}
+ int cthd_engine_adaptive::evaluate_condition(struct condition condition) {
+ 	if (condition.condition == Default)
+ 		return THD_SUCCESS;
+@@ -566,6 +582,10 @@ int cthd_engine_adaptive::evaluate_condition(struct condition condition) {
+ 		return evaluate_temperature_condition(condition);
+ 	}
+ 
++	if (condition.condition == Lid_state) {
++		return evaluate_lid_condition(condition);
++	}
++
+ 	return THD_ERROR;
+ }
+ 
+@@ -755,6 +775,11 @@ int cthd_engine_adaptive::thd_engine_start(bool ignore_cpuid_check) {
+ 		return THD_ERROR;
+ 	}
+ 
++	upower_client = up_client_new();
++	if (upower_client == NULL) {
++		thd_log_error("Unable to connect to upower\n");
++	}
++
+ 	if (verify_conditions()) {
+ 		thd_log_error("Unable to verify conditions are supported\n");
+ 		return THD_ERROR;
+diff --git a/src/thd_engine_adaptive.h b/src/thd_engine_adaptive.h
+index 7997a88..bb44021 100644
+--- a/src/thd_engine_adaptive.h
++++ b/src/thd_engine_adaptive.h
+@@ -26,6 +26,8 @@
+ #ifndef THD_ENGINE_ADAPTIVE_H_
+ #define THD_ENGINE_ADAPTIVE_H_
+ 
++#include <upower.h>
++
+ #include "thd_engine_default.h"
+ #include "thd_cpu_default_binding.h"
+ #include "thd_adaptive_types.h"
+@@ -146,6 +148,7 @@ protected:
+ 	std::vector<struct adaptive_target> targets;
+ 	std::vector<struct psvt> psvts;
+ 	std::string int3400_path;
++	UpClient *upower_client;
+ 	int get_type(char *object, int *offset);
+ 	uint64_t get_uint64(char *object, int *offset);
+ 	char *get_string(char *object, int *offset);
+@@ -166,6 +169,7 @@ protected:
+ 	int compare_condition(struct condition condition, int value);
+ 	int evaluate_oem_condition(struct condition condition);
+ 	int evaluate_temperature_condition(struct condition condition);
++	int evaluate_lid_condition(struct condition condition);
+ 	int evaluate_condition(struct condition condition);
+ 	int evaluate_condition_set(std::vector<struct condition> condition_set);
+ 	int evaluate_conditions();
+-- 
+2.27.0
+

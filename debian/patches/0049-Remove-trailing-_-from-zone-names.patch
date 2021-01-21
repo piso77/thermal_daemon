@@ -1,0 +1,46 @@
+From d308aced6ef2aeeda2d640288a15ce093a3f55f4 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Mon, 13 Apr 2020 19:13:41 -0700
+Subject: [PATCH 049/134] Remove trailing _ from zone names
+
+Names are padded out to four characters using trailing _ characters, but
+device names aren't padded. Trim the trailing characters so we can match
+more easily.
+
+(cherry picked from commit d664cf4c639d635fca6a4b31a5afeb80f49bc932)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit ed7998db7190556f5ab9958f378a14df2923fc94)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 80f65f1..24adae7 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -679,6 +679,10 @@ int cthd_engine_adaptive::install_passive(struct psv *psv) {
+ 	else
+ 		psv_zone = psv->target.substr(pos + 1);
+ 
++	while (psv_zone.back() == '_') {
++		psv_zone.pop_back();
++	}
++
+ 	cthd_zone *zone = search_zone(psv_zone);
+ 	if (!zone) {
+ 		thd_log_warn("Unable to find a zone for %s\n", psv_zone.c_str());
+@@ -692,6 +696,10 @@ int cthd_engine_adaptive::install_passive(struct psv *psv) {
+ 	else
+ 		psv_cdev = psv->source.substr(pos + 1);
+ 
++	while (psv_cdev.back() == '_') {
++		psv_cdev.pop_back();
++	}
++
+ 	cthd_cdev *cdev = search_cdev(psv_cdev);
+ 
+ 	// HACK - if the cdev is RAPL and the sensor is memory, use the
+-- 
+2.27.0
+

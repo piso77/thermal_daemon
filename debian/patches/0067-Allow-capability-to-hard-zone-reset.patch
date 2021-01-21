@@ -1,0 +1,101 @@
+From 29577fa51ab8b8dfa927c45de7c7b176e9f8c228 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 31 Jul 2020 15:34:14 -0700
+Subject: [PATCH 067/134] Allow capability to hard zone reset
+
+Allow capability that all cdevs in a zone to be forced to
+min state, without looking at their current state as min
+already. This capability will be used later when cdev
+min state changed as part of some adaptive policies.
+
+(cherry picked from commit 8059fa4f6e288743757d3342b9b20948472aa428)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 0096ee33d6515545f8369b6a463b84450f805656)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_trip_point.cpp | 5 +++--
+ src/thd_trip_point.h   | 2 +-
+ src/thd_zone.cpp       | 6 +++---
+ src/thd_zone.h         | 2 +-
+ 4 files changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/src/thd_trip_point.cpp b/src/thd_trip_point.cpp
+index 4b1abf8..0533a70 100644
+--- a/src/thd_trip_point.cpp
++++ b/src/thd_trip_point.cpp
+@@ -347,13 +347,14 @@ int cthd_trip_point::thd_trip_point_add_cdev_index(int _index, int influence) {
+ 	}
+ }
+ 
+-void cthd_trip_point::thd_trip_cdev_state_reset() {
++void cthd_trip_point::thd_trip_cdev_state_reset(int force) {
+ 	thd_log_debug("thd_trip_cdev_state_reset \n");
+ 	for (int i = cdevs.size() - 1; i >= 0; --i) {
+ 		cthd_cdev *cdev = cdevs[i].cdev;
+ 		thd_log_debug("thd_trip_cdev_state_reset index %d:%s\n",
+ 				cdev->thd_cdev_get_index(), cdev->get_cdev_type().c_str());
+-		if (cdev->in_min_state()) {
++
++		if (!force && cdev->in_min_state()) {
+ 			thd_log_debug("Need to switch to next cdev \n");
+ 			// No scope of control with this cdev
+ 			continue;
+diff --git a/src/thd_trip_point.h b/src/thd_trip_point.h
+index a32e685..65ce855 100644
+--- a/src/thd_trip_point.h
++++ b/src/thd_trip_point.h
+@@ -115,7 +115,7 @@ public:
+ 		cdevs.clear();
+ 	}
+ 
+-	void thd_trip_cdev_state_reset();
++	void thd_trip_cdev_state_reset(int force = 0);
+ 	int thd_trip_point_value() {
+ 		return temp;
+ 	}
+diff --git a/src/thd_zone.cpp b/src/thd_zone.cpp
+index 4dc4ba4..7f974f0 100644
+--- a/src/thd_zone.cpp
++++ b/src/thd_zone.cpp
+@@ -59,7 +59,7 @@ void cthd_zone::thermal_zone_temp_change(int id, unsigned int temp, int pref) {
+ 		trip_point.thd_trip_point_check(id, temp, pref, &reset);
+ 		// Force all cooling devices to min state
+ 		if (reset) {
+-			zone_reset();
++			zone_reset(0);
+ 			break;
+ 		}
+ 	}
+@@ -200,14 +200,14 @@ void cthd_zone::zone_temperature_notification(int type, int data) {
+ 	read_zone_temp();
+ }
+ 
+-void cthd_zone::zone_reset() {
++void cthd_zone::zone_reset(int force) {
+ 	int i, count;
+ 
+ 	if (zone_active) {
+ 		count = trip_points.size();
+ 		for (i = count - 1; i >= 0; --i) {
+ 			cthd_trip_point &trip_point = trip_points[i];
+-			trip_point.thd_trip_cdev_state_reset();
++			trip_point.thd_trip_cdev_state_reset(force);
+ 		}
+ 	}
+ }
+diff --git a/src/thd_zone.h b/src/thd_zone.h
+index b3ab500..b4fe566 100644
+--- a/src/thd_zone.h
++++ b/src/thd_zone.h
+@@ -77,7 +77,7 @@ public:
+ 	void zone_temperature_notification(int type, int data);
+ 	int zone_update();
+ 	virtual void update_zone_preference();
+-	void zone_reset();
++	void zone_reset(int force = 0);
+ 
+ 	virtual int read_trip_points() = 0;
+ 	virtual int read_cdev_trip_points() = 0;
+-- 
+2.27.0
+

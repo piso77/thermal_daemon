@@ -1,0 +1,31 @@
+From 143693b94609cb75b5756976e561dd601c9d4e4d Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sat, 11 Apr 2020 16:19:36 -0700
+Subject: [PATCH 028/134] Make thd_engine_start() virtual
+
+We want engines to be able to override this.
+
+(cherry picked from commit 4ae996f720931f366e039df908f2d0160c382ca0)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 34ab46b4d4e9b8b7235ef291be180f5a73390b40)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/thd_engine.h b/src/thd_engine.h
+index 34a1563..6c3538d 100644
+--- a/src/thd_engine.h
++++ b/src/thd_engine.h
+@@ -146,7 +146,7 @@ public:
+ 		return control_mode;
+ 	}
+ 	void thd_engine_thread();
+-	int thd_engine_start(bool ignore_cpuid_check);
++	virtual int thd_engine_start(bool ignore_cpuid_check);
+ 	int thd_engine_stop();
+ 	int check_cpu_id();
+ 
+-- 
+2.27.0
+

@@ -1,0 +1,33 @@
+From 4c5b669ec9b80067bb0aa44c3318a666f7d2a43c Mon Sep 17 00:00:00 2001
+From: Benjamin Berg <bberg@redhat.com>
+Date: Thu, 9 Jul 2020 16:33:33 +0200
+Subject: [PATCH 082/134] main: Do not add prefixes when logging to syslog
+
+This just duplicates information that syslog already has anyway, making
+it uneccessary and more confusing than helpful.
+
+See: #237
+(cherry picked from commit fba2766b23a61c029d27b38bd89ac348e4da4b5a)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 3a01ca7ff42b0b25098090d1b11be1ce491c5aba)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/main.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/main.cpp b/src/main.cpp
+index a0eef09..59ca291 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -121,7 +121,7 @@ void thd_logger(const gchar *log_domain, GLogLevelFlags log_level,
+ 	seconds = time(NULL);
+ 
+ 	if (thd_daemonize)
+-		syslog(syslog_priority, "[%lld]%s%s", (long long) seconds, prefix, message);
++		syslog(syslog_priority, "%s", message);
+ 	else
+ 		g_print("[%lld]%s%s", (long long) seconds, prefix, message);
+ 
+-- 
+2.27.0
+

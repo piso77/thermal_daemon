@@ -1,0 +1,151 @@
+From 29ba327621ba60799a02498ca152b2935b08bd74 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sat, 11 Apr 2020 16:13:01 -0700
+Subject: [PATCH 025/134] Allow the DRAM RAPL device to use PPCC
+
+Firmware may provide multiple PPCC entries, including one for DRAM. Try to
+use it if we can, but fix up the XML parser to it makes sure that we don't
+break existing setups.
+
+(cherry picked from commit 126483e89688e311358806b13ddc6218bd46da39)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 446e3295d29be30eabfc87c534720de09435fb12)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_cdev_rapl.cpp    | 9 ++-------
+ src/thd_cdev_rapl.h      | 3 ++-
+ src/thd_cdev_rapl_dram.h | 1 +
+ src/thd_engine.cpp       | 4 ++--
+ src/thd_engine.h         | 2 +-
+ src/thd_parse.cpp        | 5 ++++-
+ src/thd_parse.h          | 3 ++-
+ 7 files changed, 14 insertions(+), 13 deletions(-)
+
+diff --git a/src/thd_cdev_rapl.cpp b/src/thd_cdev_rapl.cpp
+index dc8e7c2..51b6c95 100644
+--- a/src/thd_cdev_rapl.cpp
++++ b/src/thd_cdev_rapl.cpp
+@@ -274,12 +274,7 @@ int cthd_sysfs_cdev_rapl::update() {
+ 	if (rapl_sysfs_valid())
+ 		return THD_ERROR;
+ 
+-	// Since this base class is also used by DRAM rapl, avoid reading PPCC as
+-	// there are no power limits defined by DPTF based systems for any other
+-	// domain other than package-0
+-	cdev_sysfs.read("name", domain_name);
+-	if (domain_name == "package-0")
+-		ppcc = read_ppcc_power_limits();
++	ppcc = read_ppcc_power_limits();
+ 
+ 	if (ppcc) {
+ 		int current_pl1;
+@@ -383,7 +378,7 @@ bool cthd_sysfs_cdev_rapl::read_ppcc_power_limits() {
+ 	csys_fs sys_fs;
+ 	ppcc_t *ppcc;
+ 
+-	ppcc = thd_engine->get_ppcc_param();
++	ppcc = thd_engine->get_ppcc_param(device_name);
+ 	if (ppcc) {
+ 		int def_max_power;
+ 
+diff --git a/src/thd_cdev_rapl.h b/src/thd_cdev_rapl.h
+index ac8dbea..bafbf1f 100644
+--- a/src/thd_cdev_rapl.h
++++ b/src/thd_cdev_rapl.h
+@@ -43,6 +43,7 @@ protected:
+ 	int power_on_constraint_0_pwr;
+ 	int power_on_constraint_0_time_window;
+ 	int power_on_enable_status;
++	std::string device_name;
+ 	virtual bool read_ppcc_power_limits();
+ 
+ private:
+@@ -73,7 +74,7 @@ public:
+ 					0), pl0_step_pwr(
+ 					0), bios_locked(false), constrained(
+ 					false), power_on_constraint_0_pwr(0), power_on_constraint_0_time_window(
+-					0), power_on_enable_status(0)
++					0), power_on_enable_status(0), device_name("TCPU.D0")
+ 	{
+ 	}
+ 	cthd_sysfs_cdev_rapl(unsigned int _index, int package,
+diff --git a/src/thd_cdev_rapl_dram.h b/src/thd_cdev_rapl_dram.h
+index 067e9d2..0080920 100644
+--- a/src/thd_cdev_rapl_dram.h
++++ b/src/thd_cdev_rapl_dram.h
+@@ -33,6 +33,7 @@ private:
+ public:
+ 	cthd_sysfs_cdev_rapl_dram(unsigned int _index, int _package) :
+ 			cthd_sysfs_cdev_rapl(_index, _package) {
++		device_name = "TMEM.D0";
+ 	}
+ 
+ 	virtual int update();
+diff --git a/src/thd_engine.cpp b/src/thd_engine.cpp
+index 63953f4..afb52eb 100644
+--- a/src/thd_engine.cpp
++++ b/src/thd_engine.cpp
+@@ -820,8 +820,8 @@ void cthd_engine::thd_read_default_cooling_devices() {
+ 			cdevs.size());
+ }
+ 
+-ppcc_t* cthd_engine::get_ppcc_param() {
+-	return parser.get_ppcc_param();
++ppcc_t* cthd_engine::get_ppcc_param(std::string name) {
++	return parser.get_ppcc_param(name);
+ }
+ 
+ cthd_zone* cthd_engine::search_zone(std::string name) {
+diff --git a/src/thd_engine.h b/src/thd_engine.h
+index cd25aff..34a1563 100644
+--- a/src/thd_engine.h
++++ b/src/thd_engine.h
+@@ -229,7 +229,7 @@ public:
+ 	std::string get_config_file() {
+ 		return config_file;
+ 	}
+-	ppcc_t *get_ppcc_param();
++	virtual ppcc_t *get_ppcc_param(std::string name);
+ 	cthd_zone *search_zone(std::string name);
+ 	cthd_cdev *search_cdev(std::string name);
+ 	cthd_sensor *search_sensor(std::string name);
+diff --git a/src/thd_parse.cpp b/src/thd_parse.cpp
+index c35d2a8..d66fba4 100644
+--- a/src/thd_parse.cpp
++++ b/src/thd_parse.cpp
+@@ -920,7 +920,10 @@ thermal_zone_t *cthd_parse::get_zone_dev_index(unsigned int zone_index) {
+ 
+ }
+ 
+-ppcc_t *cthd_parse::get_ppcc_param() {
++ppcc_t *cthd_parse::get_ppcc_param(std::string name) {
++	if (name != "TCPU.D0")
++		return NULL;
++
+ 	if (matched_thermal_info_index >= 0 && thermal_info_list[matched_thermal_info_index].ppcc.valid)
+ 		return &thermal_info_list[matched_thermal_info_index].ppcc;
+ 
+diff --git a/src/thd_parse.h b/src/thd_parse.h
+index 4bd7b8d..6a79de5 100644
+--- a/src/thd_parse.h
++++ b/src/thd_parse.h
+@@ -122,6 +122,7 @@ typedef struct {
+ } cooling_dev_t;
+ 
+ typedef struct {
++	std::string name;
+ 	int valid;
+ 	int power_limit_min;
+ 	int power_limit_max;
+@@ -195,7 +196,7 @@ public:
+ 	void dump_thermal_conf();
+ 	bool platform_matched();
+ 	int get_polling_interval();
+-	ppcc_t *get_ppcc_param();
++	ppcc_t *get_ppcc_param(std::string name);
+ 	int zone_count() {
+ 		return thermal_info_list[matched_thermal_info_index].zones.size();
+ 	}
+-- 
+2.27.0
+

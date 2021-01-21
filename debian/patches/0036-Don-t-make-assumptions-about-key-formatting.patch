@@ -1,0 +1,35 @@
+From 39c09d8e540812e9a2b66c800cc83cab4b3cb68c Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sun, 12 Apr 2020 12:56:57 -0700
+Subject: [PATCH 036/134] Don't make assumptions about key formatting
+
+We're not going to do anything with this data right now, so if it's not
+something we can parse, bail.
+
+(cherry picked from commit 6968d87e5a42d3a953483ee37afccf36c0493ff0)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 3a9f7aa2106be6bf15d1b3783d1e08dcb6237984)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index d51be9d..8ca7e2b 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -346,6 +346,11 @@ int cthd_engine_adaptive::parse_gddv(char *buf, int size) {
+ 		offset += vallength;
+ 
+ 		str = strtok(key, "/");
++		if (!str) {
++			free(key);
++			free(val);
++			continue;
++		}
+                 if (strcmp(str, "participants") == 0) {
+                         name = strtok(NULL, "/");
+                         type = strtok(NULL, "/");
+-- 
+2.27.0
+

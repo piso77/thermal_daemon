@@ -1,0 +1,66 @@
+From cb74453de06a2d5888f6e9e13d45dc1a97eaf4c7 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 24 Jul 2020 17:02:26 -0700
+Subject: [PATCH 074/134] Don't call action on current target
+
+If a target is already matched, don't call to take action again
+for the same target.
+
+(cherry picked from commit b4932672dc4f9c63ec978059e7ed12f5aa66e9da)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 1042ac45424d4a45fd0e12d0256bf64e13ab9e40)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 5 +++++
+ src/thd_engine_adaptive.h   | 5 ++++-
+ 2 files changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index fc13d74..a16cca0 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -921,6 +921,10 @@ int cthd_engine_adaptive::evaluate_conditions() {
+ 
+ 	for (int i = 0; i < (int) conditions.size(); i++) {
+ 		if (evaluate_condition_set(conditions[i]) == THD_SUCCESS) {
++			if (policy_active && i == current_condition_set)
++				break;
++
++			current_condition_set = i;
+ 			target = conditions[i][0].target;
+ 			break;
+ 		}
+@@ -1201,6 +1205,7 @@ void cthd_engine_adaptive::update_engine_state() {
+ 			continue;
+ 		execute_target(targets[i]);
+ 	}
++	policy_active = 1;
+ }
+ 
+ static int is_event_device(const struct dirent *dir) {
+diff --git a/src/thd_engine_adaptive.h b/src/thd_engine_adaptive.h
+index 7da41c3..4084f4e 100644
+--- a/src/thd_engine_adaptive.h
++++ b/src/thd_engine_adaptive.h
+@@ -154,6 +154,8 @@ protected:
+ 	std::string int3400_path;
+ 	UpClient *upower_client;
+ 	struct libevdev *tablet_dev;
++	int current_condition_set;
++	int policy_active;
+ 	int get_type(char *object, int *offset);
+ 	uint64_t get_uint64(char *object, int *offset);
+ 	char* get_string(char *object, int *offset);
+@@ -192,7 +194,8 @@ protected:
+ 	void dump_psvt();
+ public:
+ 	cthd_engine_adaptive() :
+-			cthd_engine_default("63BE270F-1C11-48FD-A6F7-3AF253FF3E2D") {
++			cthd_engine_default("63BE270F-1C11-48FD-A6F7-3AF253FF3E2D"), current_condition_set(
++					0xffff), policy_active(0) {
+ 	}
+ 
+ 	~cthd_engine_adaptive();
+-- 
+2.27.0
+

@@ -1,0 +1,60 @@
+From 67d38f5c20299ba1fd01111eeafef58209991a1d Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Thu, 9 Jan 2020 17:12:34 -0800
+Subject: [PATCH 014/134] Save some CPU cycles
+
+When the poll interval is not 0, don't register for kernel uevents.
+In some cases too many udev events are generated to cause wakeup
+from poll.
+
+(cherry picked from commit 356a7aebc9d7562a2ea52d6b665dcb527f5b52a9)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 402e7460ece1a859fb508db750b89b2634f2d7da)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine.cpp | 27 +++++++++++++--------------
+ 1 file changed, 13 insertions(+), 14 deletions(-)
+
+diff --git a/src/thd_engine.cpp b/src/thd_engine.cpp
+index b06b8f3..429e0ff 100644
+--- a/src/thd_engine.cpp
++++ b/src/thd_engine.cpp
+@@ -265,22 +265,21 @@ int cthd_engine::thd_engine_start(bool ignore_cpuid_check) {
+ 		if (i == zones.size()) {
+ 			thd_log_info("Proceed without polling mode! \n");
+ 		}
+-	}
+ 
+-	uevent_fd = poll_fd_cnt;
+-	poll_fds[uevent_fd].fd = kobj_uevent.kobj_uevent_open();
+-	if (poll_fds[uevent_fd].fd < 0) {
+-		thd_log_warn("Invalid kobj_uevent handle\n");
+-		uevent_fd = -1;
+-		goto skip_kobj;
++		uevent_fd = poll_fd_cnt;
++		poll_fds[uevent_fd].fd = kobj_uevent.kobj_uevent_open();
++		if (poll_fds[uevent_fd].fd < 0) {
++			thd_log_warn("Invalid kobj_uevent handle\n");
++			uevent_fd = -1;
++			goto skip_kobj;
++		}
++		thd_log_info("FD = %d\n", poll_fds[uevent_fd].fd);
++		kobj_uevent.register_dev_path(
++				(char *) "/devices/virtual/thermal/thermal_zone");
++		poll_fds[uevent_fd].events = POLLIN;
++		poll_fds[uevent_fd].revents = 0;
++		poll_fd_cnt++;
+ 	}
+-	thd_log_info("FD = %d\n", poll_fds[uevent_fd].fd);
+-	kobj_uevent.register_dev_path(
+-			(char *) "/devices/virtual/thermal/thermal_zone");
+-	poll_fds[uevent_fd].events = POLLIN;
+-	poll_fds[uevent_fd].revents = 0;
+-	poll_fd_cnt++;
+-
+ 	skip_kobj:
+ #ifndef DISABLE_PTHREAD
+ 	// Create thread
+-- 
+2.27.0
+

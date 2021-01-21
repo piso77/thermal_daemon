@@ -1,0 +1,66 @@
+From fd92dcc07e69fa8402b9c2db7e98705ed43cd0e2 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 24 Jul 2020 17:05:06 -0700
+Subject: [PATCH 108/134] Delay call to update_engine_state
+
+During fast polling it will be called every second and in normal
+cycle it gets called every 4 sec by default.
+
+But conditions don't change that often so call once 4 seconds or
+use user specified polling interval. Since on some platforms there
+are too many condition sets and each contain many conditions, it
+will reduce processing overhead.
+
+(cherry picked from commit 397616a242494b962e9599bb81c5e31f63212191)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 8df75c1fea3ce231b915cbd5fbe405f8ba48ea7e)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine.cpp | 11 +++++++++--
+ src/thd_engine.h   |  1 +
+ 2 files changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/src/thd_engine.cpp b/src/thd_engine.cpp
+index 8457f73..f1bee30 100644
+--- a/src/thd_engine.cpp
++++ b/src/thd_engine.cpp
+@@ -51,7 +51,7 @@ cthd_engine::cthd_engine(std::string _uuid) :
+ 				false), parse_thermal_cdev_success(false), uuid(_uuid), parser_disabled(false), poll_timeout_msec(
+ 				-1), wakeup_fd(-1), uevent_fd(-1), control_mode(COMPLEMENTRY), write_pipe_fd(
+ 				0), preference(0), status(true), thz_last_uevent_time(0), thz_last_temp_ind_time(
+-				0), terminate(false), genuine_intel(0), has_invariant_tsc(0), has_aperf(
++				0), thz_last_update_event_time(0), terminate(false), genuine_intel(0), has_invariant_tsc(0), has_aperf(
+ 				0), proc_list_matched(false), poll_interval_sec(0), poll_sensor_mask(
+ 				0), fast_poll_sensor_mask(0), saved_poll_interval(0), poll_fd_cnt(0), rt_kernel(false), parser_init_done(false) {
+ 	thd_engine = pthread_t();
+@@ -154,7 +154,14 @@ void cthd_engine::thd_engine_thread() {
+ 				thd_log_debug("Terminating thread..\n");
+ 			}
+ 		}
+-		update_engine_state();
++
++		if ((tm - thz_last_update_event_time) >= thd_poll_interval) {
++			pthread_mutex_lock(&thd_engine_mutex);
++			update_engine_state();
++			pthread_mutex_unlock(&thd_engine_mutex);
++			thz_last_update_event_time = tm;
++		}
++
+ 		workarounds();
+ 	}
+ 	thd_log_debug("thd_engine_thread_end\n");
+diff --git a/src/thd_engine.h b/src/thd_engine.h
+index c96a3f4..5842bf8 100644
+--- a/src/thd_engine.h
++++ b/src/thd_engine.h
+@@ -96,6 +96,7 @@ private:
+ 	bool status;
+ 	time_t thz_last_uevent_time;
+ 	time_t thz_last_temp_ind_time;
++	time_t thz_last_update_event_time;
+ 	bool terminate;
+ 	int genuine_intel;
+ 	int has_invariant_tsc;
+-- 
+2.27.0
+

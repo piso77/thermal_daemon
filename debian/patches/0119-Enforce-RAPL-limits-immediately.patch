@@ -1,0 +1,35 @@
+From fe6129878a08bd7219062391537086867dde341d Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Wed, 15 Apr 2020 15:48:00 -0700
+Subject: [PATCH 119/134] Enforce RAPL limits immediately
+
+If the current state is outside the new RAPL limits, clamp it to the limit.
+
+(cherry picked from commit 4d8939dfcdb53353d042e3b701ae2c0c05ae36bf)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 768aa791031b71a86ea538d8a0f5b3e99e6c383c)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_cdev_rapl.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/src/thd_cdev_rapl.cpp b/src/thd_cdev_rapl.cpp
+index 2b1f77c..790566a 100644
+--- a/src/thd_cdev_rapl.cpp
++++ b/src/thd_cdev_rapl.cpp
+@@ -281,8 +281,12 @@ void cthd_sysfs_cdev_rapl::set_adaptive_target(struct adaptive_target target) {
+ 	int argument = std::stoi(target.argument, NULL);
+ 	if (target.code == "PL1MAX") {
+ 		min_state = pl0_max_pwr = argument * 1000;
++		if (curr_state > min_state)
++			set_curr_state(min_state, 1);
+ 	} else if (target.code == "PL1MIN") {
+ 		max_state = pl0_min_pwr = argument * 1000;
++		if (curr_state < max_state)
++			set_curr_state(max_state, 1);
+ 	} else if (target.code == "PL1STEP") {
+ 		pl0_step_pwr = argument * 1000;
+ 		set_inc_value(-pl0_step_pwr * 2);
+-- 
+2.27.0
+

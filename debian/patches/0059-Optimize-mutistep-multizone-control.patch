@@ -1,0 +1,150 @@
+From ee98f36cf3c57592be75ed616302bad8b5b0b9eb Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 10 Jan 2020 10:22:24 -0800
+Subject: [PATCH 059/134] Optimize mutistep, multizone control
+
+Suppose these are the steps in a zone.
+
+Zone 0 : Sensor: sensor_1
+	temp: 35 target_state: 15W
+	temp: 40 target_state: 10W
+	temp: 45 target_state: 8W
+
+Zone 1 : Sensor: sensor_2
+	temp: 35 target_state: 15W
+	temp: 40 target_state: 10W
+	temp: 45 target_state: 8W
+
+In the current code:
+
+Sequence:
+sensor_1 == 45
+   then zone 0 will cause target state to 8
+
+sensor_2 == 40
+   Since current power 8W is more constrained than 10W
+   this request will not cause call to thd_cdev_set_state()
+
+sensor_1 == 35
+   then zone 0 will cause target state to 15W
+
+But since sensor_2 is still == 40, but the power will be
+10W, more than 8W for couple of seconds till another
+scan cycle.
+
+This change will still call thd_cdev_set_state for zone_1:
+sensor_2, the request will be queued in zone_trip_limits().
+But will not be activates as it is higher than the current
+limit. But when sensor_1 temp == 35, the next entry in the
+list will be picked up which will be 10W here without couple
+of seconds of 15W.
+
+(cherry picked from commit 891e478402eb2f9140f758cf96164973042d0f8f)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit a4b7a028e08aa7c344167972dea8f704ae8008d6)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_cdev.cpp       | 24 ++++++++++++++++++++++++
+ src/thd_trip_point.cpp | 22 +++++-----------------
+ 2 files changed, 29 insertions(+), 17 deletions(-)
+
+diff --git a/src/thd_cdev.cpp b/src/thd_cdev.cpp
+index 17a9000..a0d9d0f 100644
+--- a/src/thd_cdev.cpp
++++ b/src/thd_cdev.cpp
+@@ -189,6 +189,13 @@ int cthd_cdev::thd_cdev_set_state(int set_point, int target_temp,
+ 	time_t tm;
+ 	int ret;
+ 
++	if (!state && in_min_state() && zone_trip_limits.size() == 0) {
++		// This means that the there is no device in activated state
++		// There are no entries in the list, cdev is min state and
++		// there is a call for deactivation.
++		return THD_SUCCESS;
++	}
++
+ 	time(&tm);
+ 	thd_log_info(
+ 			">>thd_cdev_set_state temperature %d:%d index:%d state:%d :zone:%d trip_id:%d target_state_valid:%d target_value :%d force:%d\n",
+@@ -238,6 +245,19 @@ int cthd_cdev::thd_cdev_set_state(int set_point, int target_temp,
+ 				}
+ 			}
+ 		}
++
++		zone_trip_limits_t limit;
++
++		limit = zone_trip_limits[zone_trip_limits.size() - 1];
++		target_value = limit.target_value;
++		target_state_valid = limit.target_state_valid;
++		if (target_state_valid
++				&& cmp_current_state(
++						map_target_state(target_state_valid, target_value))
++						<= 0) {
++			thd_log_info("Already more constraint\n");
++			return THD_SUCCESS;
++		}
+ 	} else {
+ 		thd_log_debug("zone_trip_limits.size() %zu\n", (size_t)zone_trip_limits.size());
+ 		if (zone_trip_limits.size() > 0) {
+@@ -275,6 +295,10 @@ int cthd_cdev::thd_cdev_set_state(int set_point, int target_temp,
+ 				target_state_valid = limit.target_state_valid;
+ 				zone_id = limit.zone;
+ 				trip_id = limit.trip;
++				// If the above loop caused erase of last control
++				// then the next one in the line will be activated.
++				// If not erased, this means that the previous
++				// lower control is still active.
+ 				if (!erased)
+ 				{
+ 					thd_log_info(
+diff --git a/src/thd_trip_point.cpp b/src/thd_trip_point.cpp
+index 6ee994d..00d0231 100644
+--- a/src/thd_trip_point.cpp
++++ b/src/thd_trip_point.cpp
+@@ -258,15 +258,8 @@ bool cthd_trip_point::thd_trip_point_check(int id, unsigned int read_temp,
+ 					cdev->get_cdev_type().c_str());
+ 			/*
+ 			 * When the cdev is already in max state, we skip this cdev.
+-			 * Also when the target state if any for the current trip is greater
+-			 * or equal than the current state of the cdev, then also skip.
+ 			 */
+-			if (cdev->in_max_state()
+-					|| (cdevs[i].target_state_valid
+-							&& cdev->cmp_current_state(
+-									cdev->map_target_state(
+-											cdevs[i].target_state_valid,
+-											cdevs[i].target_state)) <= 0)) {
++			if (cdev->in_max_state()) {
+ 				thd_log_debug("Need to switch to next cdev target %d \n",
+ 						cdev->map_target_state(cdevs[i].target_state_valid,
+ 								cdevs[i].target_state));
+@@ -295,11 +288,6 @@ bool cthd_trip_point::thd_trip_point_check(int id, unsigned int read_temp,
+ 			cthd_cdev *cdev = cdevs[i].cdev;
+ 			thd_log_debug("cdev at index %d:%s\n", cdev->thd_cdev_get_index(),
+ 					cdev->get_cdev_type().c_str());
+-			if (cdev->in_min_state()) {
+-				thd_log_debug("Need to switch to next cdev \n");
+-				// No scope of control with this cdev
+-				continue;
+-			}
+ 
+ 			if (cdevs[i].target_state == TRIP_PT_INVALID_TARGET_STATE)
+ 				cdevs[i].target_state = cdev->get_min_state();
+@@ -310,10 +298,10 @@ bool cthd_trip_point::thd_trip_point_check(int id, unsigned int read_temp,
+ 							cdevs[i].target_state), &cdevs[i].pid_param,
+ 					cdevs[i].pid, false);
+ 
+-			if (control_type == SEQUENTIAL) {
+-				// Only one cdev activation
+-				break;
+-			}
++				if (control_type == SEQUENTIAL) {
++					// Only one cdev activation
++					break;
++				}
+ 		}
+ 	}
+ 
+-- 
+2.27.0
+

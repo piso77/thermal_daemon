@@ -1,0 +1,38 @@
+From 361f58846128ec119e31e50e5e4967f952db1488 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Mon, 13 Apr 2020 00:58:08 -0700
+Subject: [PATCH 054/134] Fix build dependencies
+
+(cherry picked from commit 279388249174ef59e1ad9e0f91b46897afecb2dc)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 4e679ae6c2341ebc549e20a2ea472f707c543e86)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ README.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/README.txt b/README.txt
+index 2dfe668..4d28362 100644
+--- a/README.txt
++++ b/README.txt
+@@ -30,6 +30,9 @@ Install
+ 	yum install glib-devel
+ 	yum install dbus-glib-devel
+ 	yum install libxml2-devel
++	yum install upower-devel
++	yum install xz-devel
++	yum install libevdev-devel
+ 
+ Replace yum with dnf for later Fedora versions.
+ 
+@@ -66,6 +69,7 @@ Building on Ubuntu
+ 	sudo apt-get install libxml2-dev
+ 	sudo apt-get install libupower-glib-dev
+ 	sudo apt-get install liblzma-dev
++	sudo apt-get install libevdev-dev
+ 
+ 2
+ Build
+-- 
+2.27.0
+

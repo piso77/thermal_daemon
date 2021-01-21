@@ -1,0 +1,50 @@
+From 73d7deb2c9a1741b6be74302f4c9274e1f9b375d Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Mon, 1 Jun 2020 16:04:29 -0700
+Subject: [PATCH 115/134] Take care of PPCC Max<=min power
+
+When PPCC max power and ppcc min power is equal or less, ignore PPCC power
+limits.
+
+Signed-off-by: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+(cherry picked from commit d74a258c6bffea7a307cdbb82ceaf1c4ee2a88f8)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit ec691c142a9ee47a222bffaad02230fcb67bc0ab)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_cdev_rapl.cpp | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/thd_cdev_rapl.cpp b/src/thd_cdev_rapl.cpp
+index 1508a4a..acd91aa 100644
+--- a/src/thd_cdev_rapl.cpp
++++ b/src/thd_cdev_rapl.cpp
+@@ -381,6 +381,12 @@ bool cthd_sysfs_cdev_rapl::read_ppcc_power_limits() {
+ 		pl0_min_window = ppcc->time_wind_min * 1000;
+ 		pl0_step_pwr = ppcc->step_size * 1000;
+ 
++		if (pl0_max_pwr <= pl0_min_pwr) {
++			thd_log_info("Invalid limits: ppcc limits max:%u min:%u  min_win:%u step:%u\n",
++					pl0_max_pwr, pl0_min_pwr, pl0_min_window, pl0_step_pwr);
++			return false;
++		}
++
+ 		thd_log_info("ppcc limits max:%u min:%u  min_win:%u step:%u\n",
+ 				pl0_max_pwr, pl0_min_pwr, pl0_min_window, pl0_step_pwr);
+ 		def_max_power = rapl_read_pl1_max();
+@@ -424,6 +430,12 @@ bool cthd_sysfs_cdev_rapl::read_ppcc_power_limits() {
+ 	if (pl0_max_pwr && pl0_min_pwr && pl0_min_window && pl0_step_pwr) {
+ 		int def_max_power;
+ 
++		if (pl0_max_pwr <= pl0_min_pwr) {
++			thd_log_info("Invalid limits: ppcc limits max:%u min:%u  min_win:%u step:%u\n",
++					pl0_max_pwr, pl0_min_pwr, pl0_min_window, pl0_step_pwr);
++			return false;
++		}
++
+ 		thd_log_info("ppcc limits max:%u min:%u  min_win:%u step:%u\n",
+ 				pl0_max_pwr, pl0_min_pwr, pl0_min_window, pl0_step_pwr);
+ 
+-- 
+2.27.0
+

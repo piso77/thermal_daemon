@@ -1,0 +1,55 @@
+From 99c80ab19d4a088dcbc3a0c78e3f0b226d86c28c Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Mon, 13 Apr 2020 18:44:47 -0700
+Subject: [PATCH 048/134] Fix valgrind complaints
+
+Fix the free()ing of arrays allocated with new, and notice that we've hit
+the end of the data vault and are starting a new (currently unused) entry
+and avoid misparsing it.
+
+(cherry picked from commit 5ebcffbeedf9d3b7ecd4c36a17f66b83fa408aaf)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 49740b296e61f98bcdda96b826b26e2730ca23e6)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 32d28c7..80f65f1 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -382,6 +382,8 @@ int cthd_engine_adaptive::parse_gddv(char *buf, int size) {
+ 			if (unk1 == 0x005d) {
+ 				return handle_compressed_gddv(buf + offset, size - offset);
+ 			}
++			if (unk1 == 0x1fe5)
++				break;
+ 			offset += sizeof(unk1);
+ 		}
+ 
+@@ -402,8 +404,8 @@ int cthd_engine_adaptive::parse_gddv(char *buf, int size) {
+ 
+ 		str = strtok(key, "/");
+ 		if (!str) {
+-			free(key);
+-			free(val);
++			delete[](key);
++			delete[](val);
+ 			continue;
+ 		}
+                 if (strcmp(str, "participants") == 0) {
+@@ -440,8 +442,8 @@ int cthd_engine_adaptive::parse_gddv(char *buf, int size) {
+                         parse_apat(val, vallength);
+                 }
+ 
+-		delete(key);
+-		delete(val);
++		delete[](key);
++		delete[](val);
+ 	}
+ 
+ 	merge_appc();
+-- 
+2.27.0
+

@@ -1,0 +1,55 @@
+From 1bdd169ed9f5e180c5867f8e28f1ab586781fa39 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Wed, 8 Apr 2020 20:19:16 -0700
+Subject: [PATCH 018/134] Allow the XML parser to be disabled
+
+Systems may provide the DPTF policy information in an ACPI table. Allow
+that to be used directly, and disable parsing of XML config to avoid
+confusion.
+
+(cherry picked from commit e5a45b9f8f1d5c1ee253d70858e57b41c94b775c)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 6a6616bad937b318033a138e4048f7934b139d7f)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine.cpp | 4 +++-
+ src/thd_engine.h   | 1 +
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/src/thd_engine.cpp b/src/thd_engine.cpp
+index 2ea77a8..a60b144 100644
+--- a/src/thd_engine.cpp
++++ b/src/thd_engine.cpp
+@@ -48,7 +48,7 @@ static void *cthd_engine_thread(void *arg);
+ 
+ cthd_engine::cthd_engine(std::string _uuid) :
+ 		current_cdev_index(0), current_zone_index(0), current_sensor_index(0), parse_thermal_zone_success(
+-				false), parse_thermal_cdev_success(false), uuid(_uuid), poll_timeout_msec(
++				false), parse_thermal_cdev_success(false), uuid(_uuid), parser_disabled(false), poll_timeout_msec(
+ 				-1), wakeup_fd(-1), uevent_fd(-1), control_mode(COMPLEMENTRY), write_pipe_fd(
+ 				0), preference(0), status(true), thz_last_uevent_time(0), thz_last_temp_ind_time(
+ 				0), terminate(false), genuine_intel(0), has_invariant_tsc(0), has_aperf(
+@@ -1191,6 +1191,8 @@ int cthd_engine::user_add_cdev(std::string cdev_name, std::string cdev_path,
+ }
+ 
+ int cthd_engine::parser_init() {
++	if (parser_disabled)
++		return THD_ERROR;
+ 	if (parser_init_done)
+ 		return THD_SUCCESS;
+ 	if (parser.parser_init(get_config_file()) == THD_SUCCESS) {
+diff --git a/src/thd_engine.h b/src/thd_engine.h
+index 3bff380..f2119ca 100644
+--- a/src/thd_engine.h
++++ b/src/thd_engine.h
+@@ -83,6 +83,7 @@ protected:
+ 	bool parse_thermal_zone_success;
+ 	bool parse_thermal_cdev_success;
+ 	std::string uuid;
++	bool parser_disabled;
+ 
+ private:
+ 
+-- 
+2.27.0
+

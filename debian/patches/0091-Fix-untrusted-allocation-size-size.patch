@@ -1,0 +1,34 @@
+From 5dd7553b5bda6e7f59d6959283e6dcfbcbd6fc7f Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Thu, 20 Aug 2020 11:39:35 -0700
+Subject: [PATCH 091/134] Fix untrusted allocation size- size
+
+Fix issue #256
+Static analysis has detected an unverified allocation size derived from
+untrusted data in source src/thd_engine_adaptive.cpp
+
+(cherry picked from commit a07e1a60c527f27309ba00e2566bd5542839176d)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit dc9300925043f94bf768c9ee90061de9f3f88b7c)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 7ce7685..f1a3184 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -563,6 +563,9 @@ int cthd_engine_adaptive::parse_gddv(char *buf, int size) {
+ 	int offset = 0;
+ 	struct header *header;
+ 
++	if (size < (int) sizeof(struct header))
++		return THD_ERROR;
++
+ 	header = (struct header*) buf;
+ 
+ 	if (header->signature != ESIFDV_HEADER_SIGNATURE)
+-- 
+2.27.0
+

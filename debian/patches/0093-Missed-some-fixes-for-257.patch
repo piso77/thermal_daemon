@@ -1,0 +1,38 @@
+From ca7e307d83d89f756d63100d308bd7eb52c80f6f Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Thu, 20 Aug 2020 11:50:15 -0700
+Subject: [PATCH 093/134] Missed some fixes for #257
+
+Some more delete[] are required in error path.
+
+(cherry picked from commit 4b5dd4e42871542b7c258ec83b0323a2f24037f0)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit e120dd65b947119bf4daa4231ea9f7c627134e3d)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index c2df104..32cab4b 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -1366,6 +1366,7 @@ int cthd_engine_adaptive::thd_engine_start(bool ignore_cpuid_check) {
+ 
+ 	if (parse_gddv(buf, size)) {
+ 		thd_log_debug("Unable to parse GDDV");
++		delete[] buf;
+ 		return THD_ERROR;
+ 	}
+ 
+@@ -1394,6 +1395,7 @@ int cthd_engine_adaptive::thd_engine_start(bool ignore_cpuid_check) {
+ 				thd_log_info("fallback id:%d\n", i);
+ 				fallback_id = i;
+ 			} else {
++				delete[] buf;
+ 				return THD_ERROR;
+ 			}
+ 		}
+-- 
+2.27.0
+

@@ -1,0 +1,93 @@
+From b529da980978ceee48cbb41e44bc6f3f6308da0d Mon Sep 17 00:00:00 2001
+From: Benjamin Berg <bberg@redhat.com>
+Date: Thu, 9 Jul 2020 15:27:34 +0200
+Subject: [PATCH 020/134] sys_fs: Log path including prefix in messages
+
+It may be hard to know what the message is about if the prefix is not
+given.
+
+(cherry picked from commit f43ce3aa4aa4073c2da23d4952e810db3aea07af)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 324c4926ddee8009c2a34d2be86b6c79220eaa22)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_sys_fs.cpp | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/src/thd_sys_fs.cpp b/src/thd_sys_fs.cpp
+index 462b672..c5db5ba 100644
+--- a/src/thd_sys_fs.cpp
++++ b/src/thd_sys_fs.cpp
+@@ -74,12 +74,12 @@ int csys_fs::read(const std::string &path, char *buf, int len) {
+ 	std::string p = base_path + path;
+ 	int fd = ::open(p.c_str(), O_RDONLY);
+ 	if (fd < 0) {
+-		thd_log_warn("sysfs read failed %s\n", path.c_str());
++		thd_log_warn("sysfs read failed %s\n", p.c_str());
+ 		return -errno;
+ 	}
+ 	int ret = ::read(fd, buf, len);
+ 	if (ret < 0)
+-		thd_log_warn("sysfs read failed %s\n", path.c_str());
++		thd_log_warn("sysfs read failed %s\n", p.c_str());
+ 	close(fd);
+ 
+ 	return ret;
+@@ -90,17 +90,17 @@ int csys_fs::read(const std::string &path, unsigned int position, char *buf,
+ 	std::string p = base_path + path;
+ 	int fd = ::open(p.c_str(), O_RDONLY);
+ 	if (fd < 0) {
+-		thd_log_warn("sysfs read failed %s\n", path.c_str());
++		thd_log_warn("sysfs read failed %s\n", p.c_str());
+ 		return -errno;
+ 	}
+ 	if (::lseek(fd, position, SEEK_CUR) == -1) {
+-		thd_log_warn("sysfs read failed %s\n", path.c_str());
++		thd_log_warn("sysfs read failed %s\n", p.c_str());
+ 		close(fd);
+ 		return -errno;
+ 	}
+ 	int ret = ::read(fd, buf, len);
+ 	if (ret < 0)
+-		thd_log_warn("sysfs read failed %s\n", path.c_str());
++		thd_log_warn("sysfs read failed %s\n", p.c_str());
+ 	close(fd);
+ 
+ 	return ret;
+@@ -113,14 +113,14 @@ int csys_fs::read(const std::string &path, int *ptr_val) {
+ 
+ 	int fd = ::open(p.c_str(), O_RDONLY);
+ 	if (fd < 0) {
+-		thd_log_warn("sysfs open failed %s\n", path.c_str());
++		thd_log_warn("sysfs open failed %s\n", p.c_str());
+ 		return -errno;
+ 	}
+ 	ret = ::read(fd, str, sizeof(str));
+ 	if (ret > 0)
+ 		*ptr_val = atoi(str);
+ 	else
+-		thd_log_info("sysfs read failed %s\n", path.c_str());
++		thd_log_info("sysfs read failed %s\n", p.c_str());
+ 	close(fd);
+ 
+ 	return ret;
+@@ -133,14 +133,14 @@ int csys_fs::read(const std::string &path, unsigned long *ptr_val) {
+ 
+ 	int fd = ::open(p.c_str(), O_RDONLY);
+ 	if (fd < 0) {
+-		thd_log_warn("sysfs read failed %s\n", path.c_str());
++		thd_log_warn("sysfs read failed %s\n", p.c_str());
+ 		return -errno;
+ 	}
+ 	ret = ::read(fd, str, sizeof(str));
+ 	if (ret > 0)
+ 		*ptr_val = atol(str);
+ 	else
+-		thd_log_warn("sysfs read failed %s\n", path.c_str());
++		thd_log_warn("sysfs read failed %s\n", p.c_str());
+ 	close(fd);
+ 
+ 	return ret;
+-- 
+2.27.0
+

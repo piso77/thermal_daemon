@@ -1,0 +1,41 @@
+From 1ab134375ec019e8da837622993748a4940ac620 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Thu, 20 Aug 2020 12:47:51 -0700
+Subject: [PATCH 095/134] Fix issue #259
+
+Although this shouldn't happen, but anyway fixing
+potential use-after-free issue in src/thd_engine_default.cpp
+
+(cherry picked from commit 5a9ea391c76f3377a8205e38dde29e2feeb634fa)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit dee2c40bfb23f6c9b8f7f4d9e235fd1e448dcdee)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_default.cpp | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/thd_engine_default.cpp b/src/thd_engine_default.cpp
+index b9eee3a..bc426b3 100644
+--- a/src/thd_engine_default.cpp
++++ b/src/thd_engine_default.cpp
+@@ -712,6 +712,7 @@ int cthd_engine_default::read_cooling_devices() {
+ 		++current_cdev_index;
+ 	} else {
+ 		delete rapl_dev;
++		rapl_dev = NULL;
+ 	}
+ 
+ 	// Add RAPL mmio cooling device
+@@ -726,7 +727,8 @@ int cthd_engine_default::read_cooling_devices() {
+ 			++current_cdev_index;
+ 
+ 			// Prefer MMIO access over MSR access for B0D4
+-			rapl_dev->set_cdev_alias("");
++			if (rapl_dev)
++				rapl_dev->set_cdev_alias("");
+ 			rapl_mmio_dev->set_cdev_alias("B0D4");
+ 		} else {
+ 			delete rapl_mmio_dev;
+-- 
+2.27.0
+

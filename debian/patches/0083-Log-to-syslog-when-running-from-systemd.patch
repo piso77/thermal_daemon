@@ -1,0 +1,107 @@
+From 7cee2c4a740325ac2f08d7a61220c15ea20297e3 Mon Sep 17 00:00:00 2001
+From: Benjamin Berg <bberg@redhat.com>
+Date: Thu, 9 Jul 2020 16:57:56 +0200
+Subject: [PATCH 083/134] Log to syslog when running from systemd
+
+Together with the previous patch, this means that we do not have
+unneccessary prefixes in the log messages.
+
+(cherry picked from commit 53a617214b870d71e395254440ade8cf7b95292f)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit d1a1cf815b371ec228021f267ff94fca0bdd8f96)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ data/thermald.service.in |  2 +-
+ src/main.cpp             | 14 ++++++++++----
+ 2 files changed, 11 insertions(+), 5 deletions(-)
+
+diff --git a/data/thermald.service.in b/data/thermald.service.in
+index 17d640a..ca086b0 100644
+--- a/data/thermald.service.in
++++ b/data/thermald.service.in
+@@ -5,7 +5,7 @@ Description=Thermal Daemon Service
+ Type=dbus
+ SuccessExitStatus=1
+ BusName=org.freedesktop.thermald
+-ExecStart=@sbindir@/thermald --no-daemon --dbus-enable
++ExecStart=@sbindir@/thermald --systemd --dbus-enable
+ 
+ [Install]
+ WantedBy=multi-user.target
+diff --git a/src/main.cpp b/src/main.cpp
+index 59ca291..87a8558 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -62,6 +62,7 @@ static int thd_log_level = G_LOG_LEVEL_ERROR | G_LOG_LEVEL_CRITICAL
+ 
+ // Daemonize or not
+ static gboolean thd_daemonize;
++static gboolean use_syslog;
+ 
+ // Disable dbus
+ static gboolean dbus_enable;
+@@ -120,7 +121,7 @@ void thd_logger(const gchar *log_domain, GLogLevelFlags log_level,
+ 
+ 	seconds = time(NULL);
+ 
+-	if (thd_daemonize)
++	if (use_syslog)
+ 		syslog(syslog_priority, "%s", message);
+ 	else
+ 		g_print("[%lld]%s%s", (long long) seconds, prefix, message);
+@@ -171,6 +172,7 @@ int main(int argc, char *argv[]) {
+ 	gboolean log_info = FALSE;
+ 	gboolean log_debug = FALSE;
+ 	gboolean no_daemon = FALSE;
++	gboolean systemd = FALSE;
+ 	gboolean test_mode = FALSE;
+ 	gboolean ignore_default_control = FALSE;
+ 	gchar *conf_file = NULL;
+@@ -179,6 +181,7 @@ int main(int argc, char *argv[]) {
+ 	GOptionContext *opt_ctx;
+ 
+ 	thd_daemonize = TRUE;
++	use_syslog = TRUE;
+ 	dbus_enable = FALSE;
+ 
+ 	GOptionEntry options[] = {
+@@ -186,6 +189,8 @@ int main(int argc, char *argv[]) {
+ 					&show_version, N_("Print thermald version and exit"), NULL },
+ 			{ "no-daemon", 0, 0, G_OPTION_ARG_NONE, &no_daemon, N_(
+ 					"Don't become a daemon: Default is daemon mode"), NULL },
++			{ "systemd", 0, 0, G_OPTION_ARG_NONE, &systemd, N_(
++					"Assume daemon is started by systemd"), NULL },
+ 			{ "loglevel=info", 0, 0, G_OPTION_ARG_NONE, &log_info, N_(
+ 					"log severity: info level and up"), NULL },
+ 			{ "loglevel=debug", 0, 0, G_OPTION_ARG_NONE, &log_debug, N_(
+@@ -280,7 +285,8 @@ int main(int argc, char *argv[]) {
+ 	openlog("thermald", LOG_PID, LOG_USER | LOG_DAEMON | LOG_SYSLOG);
+ 	// Don't care return val
+ 	//setlogmask(LOG_CRIT | LOG_ERR | LOG_WARNING | LOG_NOTICE | LOG_DEBUG | LOG_INFO);
+-	thd_daemonize = !no_daemon;
++	thd_daemonize = !no_daemon && !systemd;
++	use_syslog = !no_daemon || systemd;
+ 	g_log_set_handler(NULL, G_LOG_LEVEL_MASK, thd_logger, NULL);
+ 
+ 	if (check_thermald_running()) {
+@@ -289,7 +295,7 @@ int main(int argc, char *argv[]) {
+ 		exit(EXIT_FAILURE);
+ 	}
+ 
+-	if (no_daemon) {
++	if (!thd_daemonize) {
+ 		signal(SIGINT, sig_int_handler);
+ 		signal(SIGTERM, sig_int_handler);
+ 	}
+@@ -308,7 +314,7 @@ int main(int argc, char *argv[]) {
+ 	if (dbus_enable)
+ 		thd_dbus_server_init(sig_int_handler);
+ 
+-	if (!no_daemon) {
++	if (thd_daemonize) {
+ 		printf("Ready to serve requests: Daemonizing.. %d\n", thd_daemonize);
+ 		thd_log_info(
+ 				"thermald ver %s: Ready to serve requests: Daemonizing..\n",
+-- 
+2.27.0
+

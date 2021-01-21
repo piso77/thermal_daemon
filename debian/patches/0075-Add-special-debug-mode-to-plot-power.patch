@@ -1,0 +1,363 @@
+From a7c9623fa7762bd18e31f7a339e610aea516a03e Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Mon, 13 Jul 2020 15:49:16 -0700
+Subject: [PATCH 075/134] Add special debug mode to plot power
+
+If TDRUNDIR/debug_mode file exist, export rapl power meter
+as a zone for plots of power using ThermalMonitor. This allows
+power plots along with temperature plot.
+
+(cherry picked from commit bfc9dfdfb9ec7078828312fc5c63fa714ed57d07)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit ce3253ac9e0b168adbce5c4b45a07b89fd92c2f7)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ Android.mk                    |  5 ++-
+ Makefile.am                   |  4 +-
+ src/thd_engine_default.cpp    | 37 ++++++++++++++++++
+ src/thd_engine_default.h      |  1 +
+ src/thd_sensor_rapl_power.cpp | 49 ++++++++++++++++++++++++
+ src/thd_sensor_rapl_power.h   | 37 ++++++++++++++++++
+ src/thd_zone_rapl_power.cpp   | 72 +++++++++++++++++++++++++++++++++++
+ src/thd_zone_rapl_power.h     | 38 ++++++++++++++++++
+ 8 files changed, 240 insertions(+), 3 deletions(-)
+ create mode 100644 src/thd_sensor_rapl_power.cpp
+ create mode 100644 src/thd_sensor_rapl_power.h
+ create mode 100644 src/thd_zone_rapl_power.cpp
+ create mode 100644 src/thd_zone_rapl_power.h
+
+diff --git a/Android.mk b/Android.mk
+index c5b55e2..dd43b46 100644
+--- a/Android.mk
++++ b/Android.mk
+@@ -37,8 +37,9 @@ LOCAL_SRC_FILES := \
+ 		src/thd_sensor_kbl_amdgpu_thermal.cpp \
+ 		src/thd_zone_kbl_g_mcp.cpp \
+ 		src/thd_sensor_kbl_g_mcp.cpp \
+-		src/thd_zone_kbl_amdgpu.cpp
+-
++		src/thd_zone_kbl_amdgpu.cpp \
++		src/thd_sensor_rapl_power.cpp \
++		src/thd_zone_rapl_power.cpp
+ 
+ LOCAL_C_INCLUDES += external/libxml2/include
+ 
+diff --git a/Makefile.am b/Makefile.am
+index 9ebb850..9e9f3a4 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -81,7 +81,9 @@ thermald_SOURCES = \
+ 	src/thd_sensor_kbl_amdgpu_thermal.cpp \
+ 	src/thd_zone_kbl_g_mcp.cpp \
+ 	src/thd_sensor_kbl_g_mcp.cpp \
+-	src/thd_zone_kbl_amdgpu.cpp
++	src/thd_zone_kbl_amdgpu.cpp \
++	src/thd_sensor_rapl_power.cpp \
++	src/thd_zone_rapl_power.cpp
+ 
+ man5_MANS = man/thermal-conf.xml.5
+ man8_MANS = man/thermald.8
+diff --git a/src/thd_engine_default.cpp b/src/thd_engine_default.cpp
+index 2c2f4bb..b9eee3a 100644
+--- a/src/thd_engine_default.cpp
++++ b/src/thd_engine_default.cpp
+@@ -44,6 +44,8 @@
+ #include "thd_zone_kbl_g_mcp.h"
+ #include "thd_cdev_kbl_amdgpu.h"
+ #include "thd_zone_kbl_g_mcp.h"
++#include "thd_sensor_rapl_power.h"
++#include "thd_zone_rapl_power.h"
+ 
+ #ifdef GLIB_SUPPORT
+ #include "thd_cdev_modem.h"
+@@ -77,6 +79,17 @@ static cooling_dev_t cpu_def_cooling_devices[] = {
+ cthd_engine_default::~cthd_engine_default() {
+ }
+ 
++int cthd_engine_default::debug_mode_on(void) {
++	static const char *debug_mode = TDRUNDIR
++	"/debug_mode";
++	struct stat s;
++
++	if (stat(debug_mode, &s))
++		return 0;
++
++	return 1;
++}
++
+ int cthd_engine_default::read_thermal_sensors() {
+ 	int index;
+ 	DIR *dir;
+@@ -196,6 +209,17 @@ int cthd_engine_default::read_thermal_sensors() {
+ 		delete mcp_power;
+ 	}
+ 
++	if (debug_mode_on()) {
++		// Only used for debug power using ThermalMonitor
++		cthd_sensor_rapl_power *rapl_power = new cthd_sensor_rapl_power(index);
++		if (rapl_power->sensor_update() == THD_SUCCESS) {
++			sensors.push_back(rapl_power);
++			++index;
++		} else {
++			delete rapl_power;
++		}
++	}
++
+ 	current_sensor_index = index;
+ 	// Add from XML sensor config
+ 	if (!parser_init() && parser.platform_matched()) {
+@@ -557,6 +581,19 @@ int cthd_engine_default::read_thermal_zones() {
+ 	}
+ 	current_zone_index = index;
+ 
++	if (debug_mode_on()) {
++		// Only used for debug power using ThermalMonitor
++		cthd_zone_rapl_power *rapl_power = new cthd_zone_rapl_power(index);
++		if (rapl_power->zone_update() == THD_SUCCESS) {
++			rapl_power->set_zone_active();
++			zones.push_back(rapl_power);
++			++index;
++		} else {
++			delete rapl_power;
++		}
++		current_zone_index = index;
++	}
++
+ 	if (!zones.size()) {
+ 		thd_log_info("No Thermal Zones found \n");
+ 		return THD_FATAL_ERROR;
+diff --git a/src/thd_engine_default.h b/src/thd_engine_default.h
+index 1acf5b8..31c8515 100644
+--- a/src/thd_engine_default.h
++++ b/src/thd_engine_default.h
+@@ -42,6 +42,7 @@ private:
+ 	int tcc_offset_checked;
+ 	int tcc_offset_low;
+ #endif
++	int debug_mode_on(void);
+ 
+ protected:
+ 	bool force_mmio_rapl;
+diff --git a/src/thd_sensor_rapl_power.cpp b/src/thd_sensor_rapl_power.cpp
+new file mode 100644
+index 0000000..4898bca
+--- /dev/null
++++ b/src/thd_sensor_rapl_power.cpp
+@@ -0,0 +1,49 @@
++/*
++ * thd_sensor_rapl_power.cpp: Power Sensor for RAPL
++ *
++ * Copyright (C) 2020 Intel Corporation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License version
++ * 2 or later as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
++ * 02110-1301, USA.
++ *
++ *
++ * Author Name <Srinivas.Pandruvada@linux.intel.com>
++ *
++ */
++
++#include <dirent.h>
++
++#include "thd_sensor_rapl_power.h"
++#include "thd_engine.h"
++
++cthd_sensor_rapl_power::cthd_sensor_rapl_power(int index) :
++		cthd_sensor(index, "", "rapl_pkg_power", SENSOR_TYPE_RAW) {
++
++	update_path("/sys/class/powercap/intel-rapl");
++}
++
++unsigned int cthd_sensor_rapl_power::read_temperature() {
++	csys_fs sysfs;
++	std::string buffer;
++
++	thd_engine->rapl_power_meter.rapl_start_measure_power();
++
++	unsigned int pkg_power = thd_engine->rapl_power_meter.rapl_action_get_power(
++			PACKAGE);
++
++	pkg_power = (pkg_power / 1000);
++	thd_log_debug("Sensor %s :power %u \n", type_str.c_str(), pkg_power);
++
++	return pkg_power;
++}
+diff --git a/src/thd_sensor_rapl_power.h b/src/thd_sensor_rapl_power.h
+new file mode 100644
+index 0000000..1780d2e
+--- /dev/null
++++ b/src/thd_sensor_rapl_power.h
+@@ -0,0 +1,37 @@
++/*
++ * thd_sensor_rapl_power.h: Power Sensor for rapl
++ *
++ * Copyright (C) 2020 Intel Corporation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License version
++ * 2 or later as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
++ * 02110-1301, USA.
++ *
++ *
++ * Author Name <Srinivas.Pandruvada@linux.intel.com>
++ *
++ */
++
++#ifndef THD_SENSOR_RAPL_POWER_H
++#define THD_SENSOR_RAPL_POWER_H
++
++#include "thd_sensor.h"
++
++class cthd_sensor_rapl_power: public cthd_sensor {
++private:
++public:
++	cthd_sensor_rapl_power(int index);
++	unsigned int read_temperature();
++};
++
++#endif
+diff --git a/src/thd_zone_rapl_power.cpp b/src/thd_zone_rapl_power.cpp
+new file mode 100644
+index 0000000..4ff14f2
+--- /dev/null
++++ b/src/thd_zone_rapl_power.cpp
+@@ -0,0 +1,72 @@
++/*
++ * thd_zone_rapl_power.cpp: thermal zone for rapl power
++ *
++ * Copyright (C) 2020 Intel Corporation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License version
++ * 2 or later as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
++ * 02110-1301, USA.
++ *
++ *
++ * Author Name <Srinivas.Pandruvada@linux.intel.com>
++ *
++ */
++
++#include "thd_engine_default.h"
++#include "thd_sys_fs.h"
++#include "thd_zone_rapl_power.h"
++
++cthd_zone_rapl_power::cthd_zone_rapl_power(int index) :
++		cthd_zone(index, "") {
++	type_str = "rapl_pkg_power";
++}
++
++int cthd_zone_rapl_power::zone_bind_sensors() {
++
++	cthd_sensor *sensor;
++
++	sensor = thd_engine->search_sensor("rapl_pkg_power");
++	if (sensor) {
++		bind_sensor(sensor);
++		return THD_SUCCESS;
++	}
++
++	return THD_ERROR;
++}
++
++int cthd_zone_rapl_power::read_trip_points() {
++	cthd_cdev *cdev_cpu;
++
++	cdev_cpu = thd_engine->search_cdev("rapl_controller");
++	if (!cdev_cpu) {
++		thd_log_info("rapl_controller, failed\n");
++		return THD_ERROR;
++	}
++
++	cthd_trip_point trip_pt_passive(0, PASSIVE, 100000, 0, index,
++	DEFAULT_SENSOR_ID, PARALLEL);
++
++	trip_pt_passive.thd_trip_point_add_cdev(*cdev_cpu,
++			cthd_trip_point::default_influence, thd_engine->get_poll_interval(),
++			0, 0, NULL);
++
++	trip_points.push_back(trip_pt_passive);
++
++	thd_log_debug("cthd_zone_rapl_power::read_trip_points  OK\n");
++
++	return THD_SUCCESS;
++}
++
++int cthd_zone_rapl_power::read_cdev_trip_points() {
++	return THD_SUCCESS;
++}
+diff --git a/src/thd_zone_rapl_power.h b/src/thd_zone_rapl_power.h
+new file mode 100644
+index 0000000..a439a90
+--- /dev/null
++++ b/src/thd_zone_rapl_power.h
+@@ -0,0 +1,38 @@
++/*
++ * thd_zone_rapl_power.h
++ *
++ * Copyright (C) 2020 Intel Corporation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License version
++ * 2 or later as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
++ * 02110-1301, USA.
++ *
++ *
++ * Author Name <Srinivas.Pandruvada@linux.intel.com>
++ *
++ */
++
++#ifndef THD_ZONE_RAPL_POWER_H
++#define THD_ZONE_RAPL_POWER_H
++
++#include "thd_zone.h"
++
++class cthd_zone_rapl_power: public cthd_zone {
++public:
++	cthd_zone_rapl_power(int index);
++	int read_trip_points();
++	int zone_bind_sensors();
++	int read_cdev_trip_points();
++};
++
++#endif
+-- 
+2.27.0
+

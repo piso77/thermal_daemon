@@ -1,0 +1,33 @@
+From bd24d6f412952eb3f8ffff0e5f5b486162349879 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Wed, 19 Aug 2020 17:56:32 -0700
+Subject: [PATCH 089/134] Static analysis issue null pointer derefrence on
+ pointer name
+
+Static analysis has detected a potential null pointer dereference on pointer "name":
+Issue is reported with #253
+
+(cherry picked from commit c8c1673f70b0f37fb41f9bb063efbbc1b3ae13b5)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 9442a89d60642b170db4625d294e2790bef92372)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 26d5b92..2282042 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -640,7 +640,7 @@ int cthd_engine_adaptive::parse_gddv(char *buf, int size) {
+ 				point = strtok(NULL, "/");
+ 			}
+ 		}
+-		if (type && strcmp(type, "ppcc") == 0) {
++		if (name && type && strcmp(type, "ppcc") == 0) {
+ 			parse_ppcc(name, val, vallength);
+ 		}
+ 
+-- 
+2.27.0
+

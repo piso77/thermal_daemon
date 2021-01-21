@@ -1,0 +1,55 @@
+From 5cd91d96aebfbc5e7a79d65d2a558466467d48ef Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Sat, 11 Jan 2020 07:53:35 -0800
+Subject: [PATCH 114/134] Set the PL1 limit from the PPCC read value
+
+Instead of leaving the default powerup value, which may not be
+optimal, change the limit.
+
+(cherry picked from commit 450a08cbed4bd17d65d64ec86a3f4b0f88f72689)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 0b2071f9041a4b301ebb8e46ae3ddc33c8ad9945)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_cdev_rapl.cpp | 18 +-----------------
+ 1 file changed, 1 insertion(+), 17 deletions(-)
+
+diff --git a/src/thd_cdev_rapl.cpp b/src/thd_cdev_rapl.cpp
+index dcee3da..1508a4a 100644
+--- a/src/thd_cdev_rapl.cpp
++++ b/src/thd_cdev_rapl.cpp
+@@ -286,8 +286,6 @@ int cthd_sysfs_cdev_rapl::update() {
+ 	ppcc = read_ppcc_power_limits();
+ 
+ 	if (ppcc) {
+-		int current_pl1;
+-
+ 		// This is a DPTF compatible platform, which defined
+ 		// maximum and minimum power limits. We can trust this to be something sane.
+ 		phy_max = pl0_max_pwr;
+@@ -298,21 +296,7 @@ int cthd_sysfs_cdev_rapl::update() {
+ 		min_state = pl0_max_pwr;
+ 		max_state = pl0_min_pwr;
+ 
+-		// Read the current power limit. If it is more than the what PPPC max, simply leave the current
+-		// limit. If not set set the current power limit as the ppcc max power.
+-		current_pl1 = rapl_read_pl1();
+-		if (current_pl1 > 0) {
+-			if (pl0_max_pwr > current_pl1) {
+-				thd_log_info(
+-						"pkg_power: powercap ppcc RAPL max power limit is more than the current PL1, current:%d max:%d \n",
+-						current_pl1, pl0_max_pwr);
+-
+-				rapl_update_pl1(pl0_max_pwr);
+-			} else {
+-				pl0_max_pwr = current_pl1;
+-			}
+-		}
+-
++		rapl_update_pl1(pl0_max_pwr);
+ 
+ 		// To be efficient to control from the current power instead of PPCC max.
+ 		thd_engine->rapl_power_meter.rapl_start_measure_power();
+-- 
+2.27.0
+

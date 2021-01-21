@@ -1,0 +1,39 @@
+From 9c4a325bb872320a0615a993a9d9cb5b7077fea5 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Wed, 29 Jan 2020 06:10:42 -0800
+Subject: [PATCH 064/134] Fix regression
+
+The commit "Optimize mutistep, multizone control" introduced a
+regression. When a trip has a multiple cooling devices, when
+deactivated, each activated device needs to be reset. So bring
+back change to skip the cooling device which reached min state.
+
+(cherry picked from commit 421659ff1e54e970c057a4c24ba0de80b847a43b)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit f2c6ac306c194997b8324a742abe04dacee5fb00)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_trip_point.cpp | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/src/thd_trip_point.cpp b/src/thd_trip_point.cpp
+index 00d0231..b439aea 100644
+--- a/src/thd_trip_point.cpp
++++ b/src/thd_trip_point.cpp
+@@ -289,6 +289,13 @@ bool cthd_trip_point::thd_trip_point_check(int id, unsigned int read_temp,
+ 			thd_log_debug("cdev at index %d:%s\n", cdev->thd_cdev_get_index(),
+ 					cdev->get_cdev_type().c_str());
+ 
++
++			if (cdev->in_min_state()) {
++				thd_log_debug("Need to switch to next cdev \n");
++				// No scope of control with this cdev
++				continue;
++			}
++
+ 			if (cdevs[i].target_state == TRIP_PT_INVALID_TARGET_STATE)
+ 				cdevs[i].target_state = cdev->get_min_state();
+ 
+-- 
+2.27.0
+

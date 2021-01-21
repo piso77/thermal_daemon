@@ -1,0 +1,30 @@
+From b1b2200ca67a7dfac657062154b08dc1cc35f50a Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Thu, 20 Aug 2020 13:18:12 -0700
+Subject: [PATCH 096/134] Init polling_interval to avid static checker warnings
+
+Init info_ptr->polling_interval to 0.
+
+(cherry picked from commit 6629663477d087a3646def75c5502703d360109a)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 0e5de49dcf0330532a9eb9bc45da3b22d25ce7d5)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_parse.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/thd_parse.cpp b/src/thd_parse.cpp
+index d66fba4..5c5745b 100644
+--- a/src/thd_parse.cpp
++++ b/src/thd_parse.cpp
+@@ -538,6 +538,7 @@ int cthd_parse::parse_new_platform_info(xmlNode * a_node, xmlDoc *doc,
+ 	char *tmp_value;
+ 
+ 	info_ptr->default_preference = PREF_ENERGY_CONSERVE;
++	info_ptr->polling_interval = 0;
+ 
+ 	for (cur_node = a_node; cur_node; cur_node = cur_node->next) {
+ 		if (cur_node->type == XML_ELEMENT_NODE) {
+-- 
+2.27.0
+

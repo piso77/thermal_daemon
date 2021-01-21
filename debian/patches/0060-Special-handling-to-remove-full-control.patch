@@ -1,0 +1,92 @@
+From e5c1d72637e076e2b3aa1a5e74188084210e376f Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 24 Jan 2020 21:26:42 -0800
+Subject: [PATCH 060/134] Special handling to remove full control
+
+[INFO]Zone 9: auto_zone_1, Active:1 Bind:1 Sensor_cnt:1
+[INFO]..sensors..
+[INFO]sensor index:1 B0D4 /sys/class/thermal/thermal_zone1/ Async:0
+[INFO]..trips..
+[INFO]index 0: type:passive temp:51000 hyst:0 zone id:9 sensor id:1 control_type:0 cdev size:1
+[INFO]cdev[0] rapl_controller, Sampling period: 0
+[INFO]	 target_state:2147483647
+[INFO]index 1: type:passive temp:52000 hyst:0 zone id:9 sensor id:1 control_type:0 cdev size:1
+[INFO]cdev[0] rapl_controller, Sampling period: 5
+[INFO]	 target_state:not defined
+[INFO]index 2: type:polling temp:45900 hyst:0 zone id:9 sensor id:1 control_type:0 cdev size:0
+
+Here it is expected that at 52C, full control is applied but at 51C full power is restored.
+But here there is an issue.
+
+if temp > 52 then
+  there will be two entries in the list
+	entry 0: temperature 51
+	entry 1: temperature 52
+
+Then temp is changed < 51
+
+First thd_cdev_set_state will be called for 51C with state = 0
+	this will cause
+		entry 0 will be deleted
+
+This will result in control will be restored using exponential controller stepwise, as there
+is no entry in the queue for 51C in the list.
+
+The fix is here to delete the entry which was currently used. In this way first the control
+for 52C will be removed and then the next entry is 51C, so full power is restored at 51C.
+
+(cherry picked from commit d625e270952ce84a464033bf90839a5ce28858bc)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 5760cb78c15b35fc5e55f6a3900a89bcb0c94c0d)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_cdev.cpp | 24 ++++++++----------------
+ 1 file changed, 8 insertions(+), 16 deletions(-)
+
+diff --git a/src/thd_cdev.cpp b/src/thd_cdev.cpp
+index a0d9d0f..412ae88 100644
+--- a/src/thd_cdev.cpp
++++ b/src/thd_cdev.cpp
+@@ -265,31 +265,23 @@ int cthd_cdev::thd_cdev_set_state(int set_point, int target_temp,
+ 			int _target_state_valid = 0;
+ 			int i;
+ 			int erased = 0;
++			zone_trip_limits_t limit;
++
++			if (length) {
++				limit = zone_trip_limits[zone_trip_limits.size() - 1];
+ 
+-			// Just remove the current zone requesting to turn off
+-			for (i = 0; i < length; ++i) {
+-				thd_log_info("match zone %d trip %d clamp_valid %d clamp %d\n",
+-						zone_trip_limits[i].zone, zone_trip_limits[i].trip,
+-						zone_trip_limits[i].target_state_valid,
+-						zone_trip_limits[i].target_value);
+-
+-				if (zone_trip_limits[i].zone == zone_id
+-						&& zone_trip_limits[i].trip == trip_id
+-						&& (force || target_state_valid
+-								== zone_trip_limits[i].target_state_valid)
+-						&& (force || target_value == zone_trip_limits[i].target_value)) {
+-					_target_state_valid = zone_trip_limits[i].target_state_valid;
++				if (limit.zone == zone_id && limit.trip == trip_id) {
++					i = zone_trip_limits.size() - 1;
++					_target_state_valid = limit.target_state_valid;
+ 					zone_trip_limits.erase(zone_trip_limits.begin() + i);
+ 					thd_log_info("Erased  [%d: %d %d\n", zone_id, trip_id,
+ 							target_value);
+ 					erased = 1;
+-					break;
++
+ 				}
+ 			}
+ 
+ 			if (zone_trip_limits.size()) {
+-				zone_trip_limits_t limit;
+-
+ 				limit = zone_trip_limits[zone_trip_limits.size() - 1];
+ 				target_value = limit.target_value;
+ 				target_state_valid = limit.target_state_valid;
+-- 
+2.27.0
+

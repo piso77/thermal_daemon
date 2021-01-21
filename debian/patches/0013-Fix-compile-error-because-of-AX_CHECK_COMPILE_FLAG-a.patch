@@ -1,0 +1,56 @@
+From 58b13de2f95ef7d090e27f733982f2f83d4aadac Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Sun, 5 Jan 2020 19:39:56 -0800
+Subject: [PATCH 013/134] Fix compile error because of AX_CHECK_COMPILE_FLAG
+ addition
+
+The previous clang support commit added AX_CHECK_COMPILE_FLAG.
+This required additional packages. So added with this commit.
+
+(cherry picked from commit 259fcccbdea097e1a21f16f893ad4f4e13a9be32)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 5b2d65f6d71bbc19b8fc1e30fae4e886004f6067)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ README.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/README.txt b/README.txt
+index b5304c2..e5965b8 100644
+--- a/README.txt
++++ b/README.txt
+@@ -24,12 +24,15 @@ Building and executing on Fedora
+ Install
+ 
+ 	yum install automake
++	yum install autoconf-archive
+ 	yum install gcc
+ 	yum install gcc-c++
+ 	yum install glib-devel
+ 	yum install dbus-glib-devel
+ 	yum install libxml2-devel
+ 
++Replace yum with dnf for later Fedora versions.
++
+ 2
+ Build
+ 
+@@ -55,6 +58,7 @@ Build
+ Building on Ubuntu
+ 1. Install
+ 	sudo apt-get install autoconf
++	sudo apt-get install autoconf-archive
+ 	sudo apt-get install g++
+ 	sudo apt-get install libglib2.0-dev
+ 	sudo apt-get install libdbus-1-dev
+@@ -88,6 +92,7 @@ Install
+ 	zypper in glib2-devel
+ 	zypper in dbus-1-glib-devel
+ 	zypper in libxml2-devel
++	zypper in automake autoconf-archive
+ 
+ For build, follow the same procedure as Fedora.
+ 
+-- 
+2.27.0
+

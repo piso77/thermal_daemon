@@ -1,0 +1,42 @@
+From ca1876644dd3af28c8d7c437cb5c11e7aed64d11 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Wed, 8 Apr 2020 20:19:40 -0700
+Subject: [PATCH 019/134] Allow derived classes of thd_engine_default to set
+ their own UUID
+
+(cherry picked from commit a968df57056f427c40ac553adce7188e7b788213)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 1af7d62615e753c6fb75d29bb137e6228f5084cb)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_default.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/src/thd_engine_default.h b/src/thd_engine_default.h
+index 90121ee..206be58 100644
+--- a/src/thd_engine_default.h
++++ b/src/thd_engine_default.h
+@@ -51,11 +51,20 @@ public:
+ 			workaround_interval(0), tcc_offset_checked(0),
+ 			tcc_offset_low(0) {
+ 	}
++	cthd_engine_default(std::string _uuid) :
++			cthd_engine(_uuid),
++			workaround_interval(0), tcc_offset_checked(0),
++			tcc_offset_low(0) {
++	}
+ #else
+ 	cthd_engine_default() :
+ 			cthd_engine("42A441D6-AE6A-462b-A84B-4A8CE79027D3"),
+ 			workaround_interval(0) {
+ 	}
++	cthd_engine_default(std::string _uuid) :
++			cthd_engine(_uuid),
++			workaround_interval(0) {
++	}
+ 
+ #endif
+ 	~cthd_engine_default();
+-- 
+2.27.0
+

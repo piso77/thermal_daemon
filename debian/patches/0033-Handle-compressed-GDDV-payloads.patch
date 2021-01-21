@@ -1,0 +1,123 @@
+From 25b99a8047de2a59cf4563f2eb26dae41a625d91 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sun, 12 Apr 2020 02:17:22 -0700
+Subject: [PATCH 033/134] Handle compressed GDDV payloads
+
+GDDV payloads can be compressed using LZMA. Add support for handling that.
+
+(cherry picked from commit 75f7cffe44063dc476fdccca17e803a4cc89e9b0)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit bc4a1666f5ce34e23ff41f113cb09ba0229e003d)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ Makefile.am                 |  3 ++-
+ configure.ac                |  2 ++
+ src/thd_engine_adaptive.cpp | 35 ++++++++++++++++++++++++++++++++---
+ src/thd_engine_adaptive.h   |  1 +
+ 4 files changed, 37 insertions(+), 4 deletions(-)
+
+diff --git a/Makefile.am b/Makefile.am
+index 3e7e0e3..5f51e4b 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -33,7 +33,8 @@ thermald_LDADD = \
+ 	$(LIBNL_LIBS) \
+ 	$(LIBM) \
+ 	$(LIBDL) \
+-	$(XML_LIBS)
++	$(XML_LIBS) \
++	$(LZMA_LIBS)
+ 
+ BUILT_SOURCES = \
+ 	thd_dbus_interface.h
+diff --git a/configure.ac b/configure.ac
+index 10b1a27..481a012 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -70,6 +70,8 @@ AC_SUBST(GLIB_LIBS)
+ 
+ PKG_CHECK_MODULES(XML, libxml-2.0 >= 2.4)
+ 
++PKG_CHECK_MODULES(LZMA, liblzma)
++
+ AC_PROG_CC
+ AC_PROG_CPP
+ AC_PROG_CXX
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 3af3a20..bb00bc5 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -1,6 +1,7 @@
+ #include <arpa/inet.h>
+ #include <dirent.h>
+ #include <errno.h>
++#include <lzma.h>
+ #include <sys/types.h>
+ #include "thd_engine_adaptive.h"
+ #include "thd_zone_cpu.h"
+@@ -257,6 +258,33 @@ int cthd_engine_adaptive::parse_psvt(char *name, char *buf, int len) {
+ 	return 0;
+ }
+ 
++int cthd_engine_adaptive::handle_compressed_gddv(char *buf, int size) {
++	uint64_t output_size = *(uint64_t *)(buf+5);
++	lzma_ret ret;
++	unsigned char *decompressed = (unsigned char*)malloc(output_size);
++	lzma_stream strm = LZMA_STREAM_INIT;
++
++	if (!decompressed)
++		thd_log_fatal("Failed to allocate buffer for decompressed output\n");
++	ret = lzma_auto_decoder(&strm, 64 * 1024 * 1024, 0);
++	if (ret)
++		thd_log_fatal("Failed to initialize LZMA decoder: %d\n", ret);
++
++	strm.next_out = decompressed;
++	strm.avail_out = output_size;
++	strm.next_in = (const unsigned char *)(buf);
++	strm.avail_in = size;
++	ret = lzma_code(&strm, LZMA_FINISH);
++	lzma_end(&strm);
++	if (ret && ret != LZMA_STREAM_END)
++		thd_log_fatal("Failed to decompress GDDV data: %d\n", ret);
++
++	parse_gddv((char *)decompressed, output_size);
++	free(decompressed);
++
++	return THD_SUCCESS;
++}
++
+ int cthd_engine_adaptive::parse_gddv(char *buf, int size) {
+ 	int offset = 0;
+ 	struct header *header;
+@@ -284,12 +312,13 @@ int cthd_engine_adaptive::parse_gddv(char *buf, int size) {
+ 		char *type = NULL;
+ 		char *point = NULL;
+ 		char *ns = NULL;
+-		
++
+ 		if (header->version == htonl(2)) {
+ 			memcpy(&unk1, buf + offset, sizeof(unk1));
++			if (unk1 == 0x005d) {
++				return handle_compressed_gddv(buf + offset, size - offset);
++			}
+ 			offset += sizeof(unk1);
+-			if (unk1 == 0x005d)
+-				thd_log_fatal("Found unsupported compressed GDDV object\n");
+ 		}
+ 
+ 		memcpy(&keyflags, buf + offset, sizeof(keyflags));
+diff --git a/src/thd_engine_adaptive.h b/src/thd_engine_adaptive.h
+index da1f1c0..d429bb1 100644
+--- a/src/thd_engine_adaptive.h
++++ b/src/thd_engine_adaptive.h
+@@ -139,6 +139,7 @@ protected:
+ 	int parse_apct(char *apct, int len);
+ 	int parse_ppcc(char *name, char *ppcc, int len);
+ 	int parse_psvt(char *name, char *psvt, int len);
++	int handle_compressed_gddv(char *buf, int size);
+ 	int parse_gddv(char *buf, int size);
+ 	struct psvt *find_psvt(std::string name);
+ 	void set_int3400_target(struct adaptive_target target);
+-- 
+2.27.0
+

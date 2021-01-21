@@ -1,0 +1,36 @@
+From d6e3b5942c81317b4bf1726c3bc92083bfa42909 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Tue, 14 Apr 2020 15:17:06 -0700
+Subject: [PATCH 050/134] Remove TMEM zone hack
+
+I can't find any supporting evidence for special casing the TMEM zone to
+use dram RAPL rather than the CPU package, and there are machines with TMEM
+zones that don't have dram RAPL, so remove it for now.
+
+(cherry picked from commit 593a9ff01cdc5144579aa23e9d73092a2832af6c)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit efbbe60313386a6e8f908c8fe8ccae0f0b60e584)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 24adae7..2e4b68c 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -702,11 +702,6 @@ int cthd_engine_adaptive::install_passive(struct psv *psv) {
+ 
+ 	cthd_cdev *cdev = search_cdev(psv_cdev);
+ 
+-	// HACK - if the cdev is RAPL and the sensor is memory, use the
+-	// rapl-dram device instead
+-	if (psv_zone == "TMEM" && psv_cdev == "B0D4")
+-		cdev = search_cdev("rapl_controller_dram");
+-
+ 	if (!cdev) {
+ 		thd_log_warn("Unable to find a cooling device for %s\n", psv_cdev.c_str());
+ 		return THD_ERROR;
+-- 
+2.27.0
+

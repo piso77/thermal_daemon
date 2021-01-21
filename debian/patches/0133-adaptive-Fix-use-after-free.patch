@@ -1,0 +1,36 @@
+From 0f2e6906f5550f8c4e92c3b3f0c2b6f3d6046fe5 Mon Sep 17 00:00:00 2001
+From: Benjamin Berg <bberg@redhat.com>
+Date: Thu, 10 Dec 2020 11:36:43 +0100
+Subject: [PATCH 133/134] adaptive: Fix use-after-free
+
+The debug logging would access a recently free'ed variable. Fix this by
+changing the order.
+
+(cherry picked from commit a10d4ddeb8b55e238289d63a2623b8936eb6bda4)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 385cad3e3ab3ba40fc8c1cd4354e6979d141938e)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 38d5098..6cf1eb7 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -691,10 +691,11 @@ int cthd_engine_adaptive::parse_gddv_key(char *buf, int size, int *end_offset) {
+ 
+ 	str = strtok(key, "/");
+ 	if (!str) {
++		thd_log_debug("Ignoring key %s\n", key);
++
+ 		delete[] (key);
+ 		delete[] (val);
+ 
+-		thd_log_debug("Ignoring key %s\n", key);
+ 		/* Ignore */
+ 		return THD_SUCCESS;
+ 	}
+-- 
+2.27.0
+

@@ -1,0 +1,34 @@
+From c6347c123fcb3ee7dd2b2b8457d90448f0721da8 Mon Sep 17 00:00:00 2001
+From: Benjamin Berg <bberg@redhat.com>
+Date: Thu, 9 Jul 2020 13:40:59 +0200
+Subject: [PATCH 086/134] data: Add ConditionVirtualization=no to systemd
+ service
+
+It is not useful to run thermald on a virtualized system, and doing so
+will simply result in log output without any real benefit. Add the
+appropriate option to not start in a virtualized environment.
+
+See #237
+
+(cherry picked from commit 03d7592796233b07fe2cdfea3372755c085c56ef)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 47fe30a99cc1173aaa4a5cf5bb25c60304ae1c93)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ data/thermald.service.in | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/data/thermald.service.in b/data/thermald.service.in
+index ca086b0..1831c7a 100644
+--- a/data/thermald.service.in
++++ b/data/thermald.service.in
+@@ -1,5 +1,6 @@
+ [Unit]
+ Description=Thermal Daemon Service
++ConditionVirtualization=no
+ 
+ [Service]
+ Type=dbus
+-- 
+2.27.0
+

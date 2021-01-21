@@ -1,0 +1,46 @@
+From d3ba52c2754fab7ab414eb124b82a474590a53eb Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Wed, 15 Apr 2020 15:39:41 -0700
+Subject: [PATCH 118/134] Configure RAPL more correctly
+
+It seems like the PL1MAX target is intended to raise the maximum RAPL limit
+rather than to immediately change the limit - this is supported by various
+laptops that set PL1MAX and also set PL1PowerLimit in the same table,
+presumably to allow a gradual ramping up to avoid immediately crossing
+other trip points.
+
+(cherry picked from commit 53397d26853f3a6e6455be50ce5e9288a213b7e9)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 10f49dfc2e6234115a2eaad41d5825e11f38a9c3)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_cdev_rapl.cpp | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/src/thd_cdev_rapl.cpp b/src/thd_cdev_rapl.cpp
+index 25d1fd5..2b1f77c 100644
+--- a/src/thd_cdev_rapl.cpp
++++ b/src/thd_cdev_rapl.cpp
+@@ -280,9 +280,17 @@ void cthd_sysfs_cdev_rapl::set_tcc(int tcc) {
+ void cthd_sysfs_cdev_rapl::set_adaptive_target(struct adaptive_target target) {
+ 	int argument = std::stoi(target.argument, NULL);
+ 	if (target.code == "PL1MAX") {
+-		set_curr_state(argument * 1000, 1);
++		min_state = pl0_max_pwr = argument * 1000;
++	} else if (target.code == "PL1MIN") {
++		max_state = pl0_min_pwr = argument * 1000;
++	} else if (target.code == "PL1STEP") {
++		pl0_step_pwr = argument * 1000;
++		set_inc_value(-pl0_step_pwr * 2);
++		set_dec_value(-pl0_step_pwr);
+ 	} else if (target.code == "PL1TimeWindow") {
+-		rapl_update_time_window(argument * 1000);
++		pl0_min_window = argument * 1000;
++	} else if (target.code == "PL1PowerLimit") {
++		set_curr_state(argument * 1000, 1);
+ 	} else if (target.code == "TccOffset") {
+ 		set_tcc(argument);
+ 	}
+-- 
+2.27.0
+

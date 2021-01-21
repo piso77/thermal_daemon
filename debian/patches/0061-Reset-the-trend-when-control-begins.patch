@@ -1,0 +1,32 @@
+From 7fd804d92d2b29b2b96abb818b977f065d0a779a Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 24 Jan 2020 21:33:45 -0800
+Subject: [PATCH 061/134] Reset the trend when control begins
+
+Whenever the exponentail controller is used, reset the trend and power
+at the begining. In some cases it doesn't reset correctly.
+
+(cherry picked from commit 1aac812ddcbbf30451e9e02ffe88c64bcb754308)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 83121bb67a9e3f1dea741d5b9ddfd9f8a8465058)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_cdev.cpp | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/thd_cdev.cpp b/src/thd_cdev.cpp
+index 412ae88..7934cd4 100644
+--- a/src/thd_cdev.cpp
++++ b/src/thd_cdev.cpp
+@@ -324,6 +324,8 @@ int cthd_cdev::thd_cdev_set_state(int set_point, int target_temp,
+ 	curr_state = get_curr_state();
+ 	if (curr_state == get_min_state()) {
+ 		control_begin();
++		curr_pow = 0;
++		trend_increase = false;
+ 	}
+ 
+ 	if (target_state_valid) {
+-- 
+2.27.0
+

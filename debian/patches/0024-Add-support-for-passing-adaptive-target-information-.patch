@@ -1,0 +1,62 @@
+From 6c9d9993138465544653e0d920ded55cb00348dd Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sat, 11 Apr 2020 00:24:30 -0700
+Subject: [PATCH 024/134] Add support for passing adaptive target information
+ to devices
+
+The adaptive target tables may include information targeted at specific
+device types. Add core support for passing that through to the cooling
+devices.
+
+(cherry picked from commit af8a63c848c46cfb536e80d37b3b7e96985a892c)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit aed2808bb65ffafe4c989ad404df67c88181e901)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_adaptive_types.h | 13 +++++++++++++
+ src/thd_cdev.h           |  2 ++
+ 2 files changed, 15 insertions(+)
+ create mode 100644 src/thd_adaptive_types.h
+
+diff --git a/src/thd_adaptive_types.h b/src/thd_adaptive_types.h
+new file mode 100644
+index 0000000..c2b47fd
+--- /dev/null
++++ b/src/thd_adaptive_types.h
+@@ -0,0 +1,13 @@
++#ifndef THD_ADAPTIVE_TYPES_H_
++#define THD_ADAPTIVE_TYPES_H_
++
++struct adaptive_target {
++	uint64_t target_id;
++	std::string name;
++	std::string participant;
++	std::string domain;
++	std::string code;
++	std::string argument;
++};
++
++#endif /* THD_ADAPTIVE_TYPES_H_ */
+diff --git a/src/thd_cdev.h b/src/thd_cdev.h
+index c7fb5f3..f544d1a 100644
+--- a/src/thd_cdev.h
++++ b/src/thd_cdev.h
+@@ -31,6 +31,7 @@
+ #include "thd_sys_fs.h"
+ #include "thd_preference.h"
+ #include "thd_pid.h"
++#include "thd_adaptive_types.h"
+ 
+ typedef struct {
+ 	int zone;
+@@ -180,6 +181,7 @@ public:
+ 	virtual int map_target_state(int target_valid, int target_state) {
+ 		return target_state;
+ 	}
++	virtual void set_adaptive_target(struct adaptive_target) {};
+ 	void set_debounce_interval(int interval) {
+ 		debounce_interval = interval;
+ 	}
+-- 
+2.27.0
+

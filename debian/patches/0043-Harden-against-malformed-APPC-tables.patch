@@ -1,0 +1,39 @@
+From 76ea8a8ddf9b62d1b9891b58714b801d2b55759d Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sun, 12 Apr 2020 16:39:16 -0700
+Subject: [PATCH 043/134] Harden against malformed APPC tables
+
+If the APPC doesn't have anything that looks like a legitimate version
+number at the start, ignore it.
+
+(cherry picked from commit 240bc0618e3fe61eb99c72b7be547e37c28be4b4)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 94ab49fb706d47bb0b414ff73c1b455c1662a8f8)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 83171b5..98cf9a5 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -99,8 +99,14 @@ int cthd_engine_adaptive::merge_appc () {
+ 
+ int cthd_engine_adaptive::parse_appc (char *appc, int len) {
+ 	int offset = 0;
+-	uint64_t version = get_uint64(appc, &offset);
++	uint64_t version;
+ 
++	if (appc[0] != 4) {
++		thd_log_info("Found malformed APPC table, ignoring\n");
++		return 0;
++	}
++
++	version = get_uint64(appc, &offset);
+ 	if (version != 1) {
+ 		// Invalid APPC tables aren't fatal
+ 		thd_log_info("Found unsupported or malformed APPC version %d\n", (int)version);
+-- 
+2.27.0
+

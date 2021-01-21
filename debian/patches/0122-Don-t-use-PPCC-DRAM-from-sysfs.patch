@@ -1,0 +1,41 @@
+From 48cf0fdb6b960264c6a1927c1e0289626af6014c Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Mon, 16 Nov 2020 17:57:57 -0800
+Subject: [PATCH 122/134] Don't use PPCC DRAM from sysfs
+
+126483e89688e311358806b13ddc6218bd46da39 commit changed DRAM to
+use PPCC power limit for DRAM for adaptive. But it forced
+to use DRAM limits for PPCC sysfs limits, which is not correct.
+This change will not allow to use PPCC power limits for DRAM.
+
+(cherry picked from commit dd8f13fc0d1192c31e05b8689abd5564919c95ed)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit fc77e483689636c877c4e84706446866d8e1b9c8)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_cdev_rapl.cpp | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/src/thd_cdev_rapl.cpp b/src/thd_cdev_rapl.cpp
+index 1f5ed6c..20fcb17 100644
+--- a/src/thd_cdev_rapl.cpp
++++ b/src/thd_cdev_rapl.cpp
+@@ -455,6 +455,15 @@ bool cthd_sysfs_cdev_rapl::read_ppcc_power_limits() {
+ 		return true;
+ 	}
+ 
++	std::string domain_name;
++
++	// Since this base class is also used by DRAM rapl, avoid reading PPCC as
++	// there are no power limits defined by DPTF based systems for any other
++	// domain other than package-0
++	cdev_sysfs.read("name", domain_name);
++	if (domain_name != "package-0")
++		return false;
++
+ 	if (sys_fs.exists("/sys/bus/pci/devices/0000:00:04.0/power_limits/"))
+ 		sys_fs.update_path("/sys/bus/pci/devices/0000:00:04.0/power_limits/");
+ 	else if (sys_fs.exists("/sys/bus/pci/devices/0000:00:0b.0/power_limits/"))
+-- 
+2.27.0
+

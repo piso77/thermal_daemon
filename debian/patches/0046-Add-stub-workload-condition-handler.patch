@@ -1,0 +1,70 @@
+From 8875b8f21e570579b2f8671dceb51523692709db Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sun, 12 Apr 2020 22:25:49 -0700
+Subject: [PATCH 046/134] Add stub workload condition handler
+
+Add a handler to report that the workload is bursty at all times - we don't
+currently have a good way to report something meaningful here.
+
+(cherry picked from commit 99b42fd773e0e9e61b23f98ea2b63bed9c869ef7)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 3ec6a5441059935cd00d4cf4feb9058df38a3c0c)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 13 +++++++++++++
+ src/thd_engine_adaptive.h   |  1 +
+ 2 files changed, 14 insertions(+)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index ce4f39d..7370ecf 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -465,6 +465,8 @@ int cthd_engine_adaptive::verify_condition(struct condition condition) {
+ 		return 0;
+ 	if (condition.condition == Power_source && upower_client != NULL)
+ 		return 0;
++	if (condition.condition == Workload)
++		return 0;
+ 
+ 	thd_log_error("Unsupported condition %d\n", condition.condition);
+ 	return THD_ERROR;
+@@ -569,6 +571,13 @@ int cthd_engine_adaptive::evaluate_lid_condition(struct condition condition) {
+ 	return compare_condition(condition, value);
+ }
+ 
++int cthd_engine_adaptive::evaluate_workload_condition(struct condition condition) {
++	// We don't have a good way to assert workload at the moment, so just
++	// default to bursty
++
++	return compare_condition(condition, 3);
++}
++
+ int cthd_engine_adaptive::evaluate_ac_condition(struct condition condition) {
+ 	int value = 0;
+ 	bool on_battery = up_client_get_on_battery(upower_client);
+@@ -603,6 +612,10 @@ int cthd_engine_adaptive::evaluate_condition(struct condition condition) {
+ 		return evaluate_ac_condition(condition);
+ 	}
+ 
++	if (condition.condition == Workload) {
++		return evaluate_workload_condition(condition);
++	}
++
+ 	return THD_ERROR;
+ }
+ 
+diff --git a/src/thd_engine_adaptive.h b/src/thd_engine_adaptive.h
+index ac601be..6a40011 100644
+--- a/src/thd_engine_adaptive.h
++++ b/src/thd_engine_adaptive.h
+@@ -171,6 +171,7 @@ protected:
+ 	int evaluate_temperature_condition(struct condition condition);
+ 	int evaluate_ac_condition(struct condition condition);
+ 	int evaluate_lid_condition(struct condition condition);
++	int evaluate_workload_condition(struct condition condition);
+ 	int evaluate_condition(struct condition condition);
+ 	int evaluate_condition_set(std::vector<struct condition> condition_set);
+ 	int evaluate_conditions();
+-- 
+2.27.0
+

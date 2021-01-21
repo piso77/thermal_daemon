@@ -1,0 +1,177 @@
+From ef35b03ee95814a6b7d27fec8ecbf2df1115ed33 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Wed, 8 Apr 2020 17:23:52 -0700
+Subject: [PATCH 017/134] Don't hardcode the UUID for INT3400
+
+Different thermal policies require different UUIDs to be written to the
+INT3400 interface. Avoid hardcoding that and allow engines to override it
+as needed.
+
+(cherry picked from commit 07051b5b0fd7e65a5491a4a34e8a68fa4e1f6b7c)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit cb7d30cebb5006dd68aa7372b635ab74b1050bb3)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine.cpp         |  9 ++++-----
+ src/thd_engine.h           |  3 ++-
+ src/thd_engine_default.cpp |  2 +-
+ src/thd_engine_default.h   |  8 +++++---
+ src/thd_int3400.cpp        | 11 +++++++----
+ src/thd_int3400.h          |  3 +++
+ src/thd_trt_art_reader.cpp |  2 +-
+ 7 files changed, 23 insertions(+), 15 deletions(-)
+
+diff --git a/src/thd_engine.cpp b/src/thd_engine.cpp
+index 903d191..2ea77a8 100644
+--- a/src/thd_engine.cpp
++++ b/src/thd_engine.cpp
+@@ -46,15 +46,14 @@
+ 
+ static void *cthd_engine_thread(void *arg);
+ 
+-cthd_engine::cthd_engine() :
++cthd_engine::cthd_engine(std::string _uuid) :
+ 		current_cdev_index(0), current_zone_index(0), current_sensor_index(0), parse_thermal_zone_success(
+-				false), parse_thermal_cdev_success(false), poll_timeout_msec(
++				false), parse_thermal_cdev_success(false), uuid(_uuid), poll_timeout_msec(
+ 				-1), wakeup_fd(-1), uevent_fd(-1), control_mode(COMPLEMENTRY), write_pipe_fd(
+ 				0), preference(0), status(true), thz_last_uevent_time(0), thz_last_temp_ind_time(
+ 				0), terminate(false), genuine_intel(0), has_invariant_tsc(0), has_aperf(
+ 				0), proc_list_matched(false), poll_interval_sec(0), poll_sensor_mask(
+-				0), fast_poll_sensor_mask(0), saved_poll_interval(0), poll_fd_cnt(
+-				0), rt_kernel(false), parser_init_done(false) {
++				0), fast_poll_sensor_mask(0), saved_poll_interval(0), poll_fd_cnt(0), rt_kernel(false), parser_init_done(false) {
+ 	thd_engine = pthread_t();
+ 	thd_attr = pthread_attr_t();
+ 
+@@ -535,7 +534,7 @@ void cthd_engine::takeover_thermal_control() {
+ 	DIR *dir;
+ 	struct dirent *entry;
+ 	const std::string base_path = "/sys/class/thermal/";
+-	cthd_INT3400 int3400;
++	cthd_INT3400 int3400(uuid);
+ 
+ 	thd_log_info("Taking over thermal control \n");
+ 
+diff --git a/src/thd_engine.h b/src/thd_engine.h
+index 127ca85..3bff380 100644
+--- a/src/thd_engine.h
++++ b/src/thd_engine.h
+@@ -82,6 +82,7 @@ protected:
+ 	int current_sensor_index;
+ 	bool parse_thermal_zone_success;
+ 	bool parse_thermal_cdev_success;
++	std::string uuid;
+ 
+ private:
+ 
+@@ -135,7 +136,7 @@ public:
+ 	cthd_parse parser;
+ 	cthd_rapl_power_meter rapl_power_meter;
+ 
+-	cthd_engine();
++	cthd_engine(std::string _uuid);
+ 	virtual ~cthd_engine();
+ 	void set_control_mode(control_mode_t mode) {
+ 		control_mode = mode;
+diff --git a/src/thd_engine_default.cpp b/src/thd_engine_default.cpp
+index 712ffbf..200c5d5 100644
+--- a/src/thd_engine_default.cpp
++++ b/src/thd_engine_default.cpp
+@@ -255,7 +255,7 @@ bool cthd_engine_default::add_int340x_processor_dev(void)
+ 
+ 	/* Specialized processor thermal device names */
+ 	cthd_zone *processor_thermal = NULL, *acpi_thermal = NULL;
+-	cthd_INT3400 int3400;
++	cthd_INT3400 int3400(uuid);
+ 	unsigned int passive, new_passive = 0, critical = 0;
+ 
+ 	if (int3400.match_supported_uuid() == THD_SUCCESS) {
+diff --git a/src/thd_engine_default.h b/src/thd_engine_default.h
+index 76b3a1d..90121ee 100644
+--- a/src/thd_engine_default.h
++++ b/src/thd_engine_default.h
+@@ -47,12 +47,14 @@ public:
+ 	static const int power_clamp_reduction_percent = 5;
+ #ifndef ANDROID
+ 	cthd_engine_default() :
+-			cthd_engine(), workaround_interval(0),
+-			tcc_offset_checked(0), tcc_offset_low(0) {
++			cthd_engine("42A441D6-AE6A-462b-A84B-4A8CE79027D3"),
++			workaround_interval(0), tcc_offset_checked(0),
++			tcc_offset_low(0) {
+ 	}
+ #else
+ 	cthd_engine_default() :
+-			cthd_engine(), workaround_interval(0){
++			cthd_engine("42A441D6-AE6A-462b-A84B-4A8CE79027D3"),
++			workaround_interval(0) {
+ 	}
+ 
+ #endif
+diff --git a/src/thd_int3400.cpp b/src/thd_int3400.cpp
+index cb7fb1d..86b4fda 100644
+--- a/src/thd_int3400.cpp
++++ b/src/thd_int3400.cpp
+@@ -28,7 +28,10 @@
+ #include <iostream>
+ #include <sstream>
+ 
+-int cthd_INT3400::match_supported_uuid(void) {
++cthd_INT3400::cthd_INT3400(std::string _uuid) : uuid(_uuid) {
++}
++
++int cthd_INT3400::match_supported_uuid() {
+ 	std::string filename =
+ 			"/sys/bus/acpi/devices/INT3400:00/physical_node/uuids/available_uuids";
+ 
+@@ -37,7 +40,7 @@ int cthd_INT3400::match_supported_uuid(void) {
+ 		std::string line;
+ 		while (std::getline(ifs, line)) {
+ 			thd_log_debug("uuid: %s\n", line.c_str());
+-			if (line == "42A441D6-AE6A-462b-A84B-4A8CE79027D3")
++			if (line == uuid)
+ 				return THD_SUCCESS;
+ 		}
+ 		ifs.close();
+@@ -52,7 +55,7 @@ void cthd_INT3400::set_default_uuid(void) {
+ 
+ 	std::ofstream ofs(filename.c_str(), std::ofstream::out);
+ 	if (ofs.good()) {
+-		thd_log_info("Set Default UUID: 42A441D6-AE6A-462b-A84B-4A8CE79027D3\n");
+-		ofs << "42A441D6-AE6A-462b-A84B-4A8CE79027D3";
++		thd_log_info("Set Default UUID: %s\n", uuid.c_str());
++		ofs << uuid;
+ 	}
+ }
+diff --git a/src/thd_int3400.h b/src/thd_int3400.h
+index a3fc957..8d35891 100644
+--- a/src/thd_int3400.h
++++ b/src/thd_int3400.h
+@@ -30,7 +30,10 @@
+ #include <vector>
+ 
+ class cthd_INT3400 {
++private:
++	std::string uuid;
+ public:
++	cthd_INT3400(std::string _uuid);
+ 	int match_supported_uuid(void);
+ 	void set_default_uuid(void);
+ };
+diff --git a/src/thd_trt_art_reader.cpp b/src/thd_trt_art_reader.cpp
+index 0174407..014e6b6 100644
+--- a/src/thd_trt_art_reader.cpp
++++ b/src/thd_trt_art_reader.cpp
+@@ -148,7 +148,7 @@ int cthd_acpi_rel::generate_conf(std::string file_name) {
+ 	string prefix;
+ 	int art_status;
+ 	int ret = 0;
+-	cthd_INT3400 int3400;
++	cthd_INT3400 int3400("42A441D6-AE6A-462b-A84B-4A8CE79027D3");
+ 
+ 	std::ifstream conf_file_check(file_name.c_str());
+ 	if (conf_file_check.is_open()) {
+-- 
+2.27.0
+

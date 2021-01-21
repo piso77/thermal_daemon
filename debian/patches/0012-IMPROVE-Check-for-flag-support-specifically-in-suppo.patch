@@ -1,0 +1,189 @@
+From 2e9c4577fc09404c6cedb435c9f1e661bc139cc1 Mon Sep 17 00:00:00 2001
+From: Andrei Pavel <andrei.pavel@cti.pub.ro>
+Date: Wed, 11 Dec 2019 13:51:19 +0200
+Subject: [PATCH 012/134] =?UTF-8?q?[=F0=9F=91=8C=20IMPROVE]=20Check=20for?=
+ =?UTF-8?q?=20flag=20support=20-=20specifically=20in=20support=20of=20clan?=
+ =?UTF-8?q?g?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+(cherry picked from commit 16e067427e9cbc3d69500d351b4e6a2fba5df4a6)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 2261b7431fe0605a75e45847452e07645aa2c63e)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ Makefile.am  | 111 +++++++++++++++++++++++----------------------------
+ configure.ac |  22 +++++++++-
+ 2 files changed, 71 insertions(+), 62 deletions(-)
+
+diff --git a/Makefile.am b/Makefile.am
+index 836b8f0..d1d8eb1 100644
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -6,24 +6,13 @@ ACLOCAL_AMFLAGS =
+ 
+ # Global C Flags
+ AM_CFLAGS = ${DBUS_CFLAGS}
+-AM_CXXFLAGS = ${DBUS_CFLAGS}\
+-		$(XML_CFLAGS) \
+-		-DTDRUNDIR=\"$(tdrundir)\" \
+-		-DTDCONFDIR=\"$(tdconfdir)\" \
+-		-I src \
+-		-Wreorder \
+-		-Wsign-compare \
+-		-Wreturn-type \
+-		-Wunused-but-set-variable\
+-		-Wformat\
+-		-Wall\
+-		-Wclobbered\
+-		-Wempty-body\
+-		-Wignored-qualifiers\
+-		-Wmissing-field-initializers\
+-		-Wtype-limits\
+-		-Wuninitialized\
+-		-Werror
++AM_CXXFLAGS = \
++	${DBUS_CFLAGS} \
++	$(XML_CFLAGS) \
++	-DTDRUNDIR=\"$(tdrundir)\" \
++	-DTDCONFDIR=\"$(tdconfdir)\" \
++	$(CXXFLAGS) \
++	-I src
+ 
+ EXTRA_DIST=Makefile.glib \
+ 	thermald.pc.in
+@@ -39,54 +28,54 @@ thermald_CPPFLAGS = \
+ 
+ thermald_includedir = @top_srcdir@
+ thermald_LDADD = \
+-        $(DBUS_LIBS) \
+-        $(GLIB_LIBS) \
+-        $(LIBNL_LIBS) \
+-        $(LIBM) \
+-        $(LIBDL) \
+-		$(XML_LIBS)
++	$(DBUS_LIBS) \
++	$(GLIB_LIBS) \
++	$(LIBNL_LIBS) \
++	$(LIBM) \
++	$(LIBDL) \
++	$(XML_LIBS)
+ 
+ BUILT_SOURCES = \
+ 	thd_dbus_interface.h
+ 
+ thermald_SOURCES = \
+-		src/main.cpp \
+-		src/thd_dbus_interface.cpp \
+-		src/thd_engine.cpp \
+-		src/thd_cdev.cpp \
+-		src/thd_cdev_therm_sys_fs.cpp \
+-		src/thd_engine_default.cpp \
+-		src/thd_sys_fs.cpp \
+-		src/thd_trip_point.cpp \
+-		src/thd_zone.cpp \
+-		src/thd_zone_cpu.cpp \
+-		src/thd_zone_therm_sys_fs.cpp \
+-		src/thd_zone_dynamic.cpp \
+-		src/thd_preference.cpp \
+-		src/thd_parse.cpp \
+-		src/thd_sensor.cpp \
+-		src/thd_sensor_virtual.cpp \
+-		src/thd_kobj_uevent.cpp \
+-		src/thd_cdev_order_parser.cpp \
+-		src/thd_cdev_gen_sysfs.cpp \
+-		src/thd_pid.cpp \
+-		src/thd_zone_generic.cpp \
+-		src/thd_cdev_cpufreq.cpp \
+-		src/thd_cdev_rapl.cpp \
+-		src/thd_cdev_intel_pstate_driver.cpp \
+-		src/thd_rapl_power_meter.cpp \
+-		src/thd_trt_art_reader.cpp \
+-		src/thd_cdev_rapl_dram.cpp \
+-		src/thd_cpu_default_binding.cpp \
+-		src/thd_cdev_backlight.cpp \
+-		src/thd_cdev_modem.cpp \
+-		src/thd_int3400.cpp \
+-		src/thd_cdev_kbl_amdgpu.cpp \
+-		src/thd_sensor_kbl_amdgpu_power.cpp \
+-		src/thd_sensor_kbl_amdgpu_thermal.cpp \
+-		src/thd_zone_kbl_g_mcp.cpp \
+-		src/thd_sensor_kbl_g_mcp.cpp \
+-		src/thd_zone_kbl_amdgpu.cpp
++	src/main.cpp \
++	src/thd_dbus_interface.cpp \
++	src/thd_engine.cpp \
++	src/thd_cdev.cpp \
++	src/thd_cdev_therm_sys_fs.cpp \
++	src/thd_engine_default.cpp \
++	src/thd_sys_fs.cpp \
++	src/thd_trip_point.cpp \
++	src/thd_zone.cpp \
++	src/thd_zone_cpu.cpp \
++	src/thd_zone_therm_sys_fs.cpp \
++	src/thd_zone_dynamic.cpp \
++	src/thd_preference.cpp \
++	src/thd_parse.cpp \
++	src/thd_sensor.cpp \
++	src/thd_sensor_virtual.cpp \
++	src/thd_kobj_uevent.cpp \
++	src/thd_cdev_order_parser.cpp \
++	src/thd_cdev_gen_sysfs.cpp \
++	src/thd_pid.cpp \
++	src/thd_zone_generic.cpp \
++	src/thd_cdev_cpufreq.cpp \
++	src/thd_cdev_rapl.cpp \
++	src/thd_cdev_intel_pstate_driver.cpp \
++	src/thd_rapl_power_meter.cpp \
++	src/thd_trt_art_reader.cpp \
++	src/thd_cdev_rapl_dram.cpp \
++	src/thd_cpu_default_binding.cpp \
++	src/thd_cdev_backlight.cpp \
++	src/thd_cdev_modem.cpp \
++	src/thd_int3400.cpp \
++	src/thd_cdev_kbl_amdgpu.cpp \
++	src/thd_sensor_kbl_amdgpu_power.cpp \
++	src/thd_sensor_kbl_amdgpu_thermal.cpp \
++	src/thd_zone_kbl_g_mcp.cpp \
++	src/thd_sensor_kbl_g_mcp.cpp \
++	src/thd_zone_kbl_amdgpu.cpp
+ 
+ man5_MANS = man/thermal-conf.xml.5
+ man8_MANS = man/thermald.8
+diff --git a/configure.ac b/configure.ac
+index 1b6cca8..10b1a27 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -78,7 +78,27 @@ AC_C_CONST
+ AC_C_INLINE
+ AC_TYPE_SIZE_T
+ 
++# Check for flag support.
++for flag in \
++    -Wall \
++    -Wclobbered \
++    -Wempty-body \
++    -Werror \
++    -Wformat \
++    -Wignored-qualifiers \
++    -Wmissing-field-initializers \
++    -Wreorder \
++    -Wreturn-type \
++    -Wsign-compare \
++    -Wtype-limits \
++    -Wuninitialized \
++    -Wunused-but-set-variable \
++; do
++    AX_CHECK_COMPILE_FLAG([-Werror ${flag}],
++                          [CXXFLAGS="$CXXFLAGS ${flag}"])
++done
++
+ AC_CONFIG_FILES([Makefile
+-data/Makefile])
++                 data/Makefile])
+ 
+ AC_OUTPUT
+-- 
+2.27.0
+

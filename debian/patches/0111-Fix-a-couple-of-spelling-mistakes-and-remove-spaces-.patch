@@ -1,0 +1,55 @@
+From 2018daad7ffa3144981e545aee93f2e244661ec1 Mon Sep 17 00:00:00 2001
+From: Colin Ian King <colin.king@canonical.com>
+Date: Tue, 19 May 2020 11:59:19 +0100
+Subject: [PATCH 111/134] Fix a couple of spelling mistakes and remove spaces
+ before \n char
+
+There are a couple of spelling mistakes, fix these. Also remove
+trailing spaces that occur before \n newline.
+
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+(cherry picked from commit bea28521e3a0352a1c58ee685e59b187bd580f8c)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit d7c7e6f4d02fd9db06db4c0ca579a16055a8a855)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine.cpp                                | 4 ++--
+ tools/thermal_monitor/qcustomplot/qcustomplot.cpp | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/thd_engine.cpp b/src/thd_engine.cpp
+index 399791e..372d20a 100644
+--- a/src/thd_engine.cpp
++++ b/src/thd_engine.cpp
+@@ -264,13 +264,13 @@ int cthd_engine::thd_engine_start(bool ignore_cpuid_check) {
+ 				continue;
+ 			if (!zone->check_sensor_async_status()) {
+ 				thd_log_warn(
+-						"Polling will be enabled as some sensors are not capable to notify asynchnously \n");
++						"Polling will be enabled as some sensors are not capable to notify asynchronously\n");
+ 				poll_timeout_msec = def_poll_interval;
+ 				break;
+ 			}
+ 		}
+ 		if (i == zones.size()) {
+-			thd_log_info("Proceed without polling mode! \n");
++			thd_log_info("Proceed without polling mode!\n");
+ 		}
+ 
+ 		uevent_fd = poll_fd_cnt;
+diff --git a/tools/thermal_monitor/qcustomplot/qcustomplot.cpp b/tools/thermal_monitor/qcustomplot/qcustomplot.cpp
+index 94cd3c2..dd0a1ca 100644
+--- a/tools/thermal_monitor/qcustomplot/qcustomplot.cpp
++++ b/tools/thermal_monitor/qcustomplot/qcustomplot.cpp
+@@ -16245,7 +16245,7 @@ void QCPSelectionDecoratorBracket::drawBracket(QCPPainter *painter, int directio
+     }
+     default:
+     {
+-      qDebug() << Q_FUNC_INFO << "unknown/custom bracket style can't be handeld by default implementation:" << static_cast<int>(mBracketStyle);
++      qDebug() << Q_FUNC_INFO << "unknown/custom bracket style can't be handled by default implementation:" << static_cast<int>(mBracketStyle);
+       break;
+     }
+   }
+-- 
+2.27.0
+

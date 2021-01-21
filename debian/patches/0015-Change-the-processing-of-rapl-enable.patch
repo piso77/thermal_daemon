@@ -1,0 +1,104 @@
+From 63357e85c2ccf5046d7d5e387756b45ed1f4801b Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Thu, 9 Jan 2020 22:49:24 -0800
+Subject: [PATCH 015/134] Change the processing of rapl enable
+
+When the PPCC limits are used also enable the rapl domain.
+When the domain is already enabled, then no need to change
+the enable during set_cur_state().
+When the PPCC limits are not enforced, don't enable till activation
+in set_cur_state().
+
+(cherry picked from commit 02f4c26d732c773f4f7340a3a43ffd67a5f37a0c)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 9ccef0cee299e481607b4b1806ec94a9c0fb5e2a)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_cdev_rapl.cpp | 18 +++++++++++++++---
+ src/thd_cdev_rapl.h   |  6 +++---
+ 2 files changed, 18 insertions(+), 6 deletions(-)
+
+diff --git a/src/thd_cdev_rapl.cpp b/src/thd_cdev_rapl.cpp
+index 97c1511..d8a5a33 100644
+--- a/src/thd_cdev_rapl.cpp
++++ b/src/thd_cdev_rapl.cpp
+@@ -62,7 +62,9 @@ void cthd_sysfs_cdev_rapl::set_curr_state(int state, int control) {
+ 
+ 		curr_state = min_state;
+ 
+-		rapl_update_enable_status(0);
++		// If disabled during power on, disable
++		if (!power_on_enable_status)
++			rapl_update_enable_status(0);
+ 
+ 		rapl_update_time_window(power_on_constraint_0_time_window);
+ 
+@@ -73,7 +75,11 @@ void cthd_sysfs_cdev_rapl::set_curr_state(int state, int control) {
+ 			// If it is the first time to activate this device, set the enabled flag
+ 			// and set the time window.
+ 			rapl_update_time_window(def_rapl_time_window);
+-			rapl_update_enable_status(1);
++
++			// Set enable flag only if it was disabled
++			if (!power_on_enable_status)
++				rapl_update_enable_status(1);
++
+ 			constrained = true;
+ 		}
+ 	}
+@@ -308,6 +314,10 @@ int cthd_sysfs_cdev_rapl::update() {
+ 		thd_engine->rapl_power_meter.rapl_start_measure_power();
+ 		dynamic_phy_max_enable = true;
+ 		//set_debounce_interval(1);
++
++		// By default enable the rapl device to enforce any power limits
++		rapl_update_enable_status(1);
++
+ 	} else {
+ 
+ 		// This is not a DPTF platform
+@@ -357,7 +367,9 @@ int cthd_sysfs_cdev_rapl::update() {
+ 	}
+ 
+ 	power_on_constraint_0_time_window = rapl_read_time_window();
+-	rapl_update_enable_status(0);
++	power_on_enable_status = rapl_read_enable_status();
++
++	thd_log_debug("power_on_enable_status: %d\n", power_on_enable_status);
+ 
+ 	thd_log_debug("RAPL max limit %d increment: %d\n", max_state, inc_dec_val);
+ 
+diff --git a/src/thd_cdev_rapl.h b/src/thd_cdev_rapl.h
+index 3d1a67c..ac8dbea 100644
+--- a/src/thd_cdev_rapl.h
++++ b/src/thd_cdev_rapl.h
+@@ -42,7 +42,7 @@ protected:
+ 	bool constrained;
+ 	int power_on_constraint_0_pwr;
+ 	int power_on_constraint_0_time_window;
+-
++	int power_on_enable_status;
+ 	virtual bool read_ppcc_power_limits();
+ 
+ private:
+@@ -73,7 +73,7 @@ public:
+ 					0), pl0_step_pwr(
+ 					0), bios_locked(false), constrained(
+ 					false), power_on_constraint_0_pwr(0), power_on_constraint_0_time_window(
+-					0)
++					0), power_on_enable_status(0)
+ 	{
+ 	}
+ 	cthd_sysfs_cdev_rapl(unsigned int _index, int package,
+@@ -85,7 +85,7 @@ public:
+ 					0), pl0_min_window(0), pl0_step_pwr(0), bios_locked(
+ 					false), constrained(
+ 					false), power_on_constraint_0_pwr(0), power_on_constraint_0_time_window(
+-					0)
++					0), power_on_enable_status(0)
+ 	{
+ 	}
+ 
+-- 
+2.27.0
+

@@ -1,0 +1,217 @@
+From 5d7ef46ea12b49be02dc96849107596f681ee053 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Mon, 16 Nov 2020 18:07:36 -0800
+Subject: [PATCH 123/134] Special treatment when powercap PL2 limit is 0
+
+In some platforms rapl-mmio PL2 limit is 0. In that case when
+rapl-mmio zone is enabled, it can throttle to very low frequency.
+
+This change reads PPCC limits from adaptive engine for PL2 and
+use it when powercap PL2 limit is 0. If not present then don't
+enable powercap rapl zone.
+
+(cherry picked from commit 2a51c627dfaca6307a0b57c2a6cca2f990495fd0)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit fbca673bc74083cdeaea9450d72c38815e7f784c)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_cdev_rapl.cpp       | 55 +++++++++++++++++++++++++++++++++++--
+ src/thd_cdev_rapl.h         | 10 ++++++-
+ src/thd_engine_adaptive.cpp | 22 ++++++++++++++-
+ src/thd_parse.cpp           |  1 +
+ src/thd_parse.h             |  7 +++++
+ 5 files changed, 90 insertions(+), 5 deletions(-)
+
+diff --git a/src/thd_cdev_rapl.cpp b/src/thd_cdev_rapl.cpp
+index 20fcb17..eec6a43 100644
+--- a/src/thd_cdev_rapl.cpp
++++ b/src/thd_cdev_rapl.cpp
+@@ -214,6 +214,19 @@ int cthd_sysfs_cdev_rapl::rapl_update_pl1(int pl1)
+ 	return THD_SUCCESS;
+ }
+ 
++int cthd_sysfs_cdev_rapl::rapl_read_pl2()
++{
++	std::stringstream temp_power_str;
++	int current_pl2;
++
++	temp_power_str << "constraint_" << pl2_index << "_power_limit_uw";
++	if (cdev_sysfs.read(temp_power_str.str(), &current_pl2) > 0) {
++		return current_pl2;
++	}
++
++	return THD_ERROR;
++}
++
+ int cthd_sysfs_cdev_rapl::rapl_update_pl2(int pl2)
+ {
+ 	std::stringstream temp_power_str;
+@@ -264,6 +277,22 @@ int cthd_sysfs_cdev_rapl::rapl_update_time_window(int time_window)
+ 	return THD_SUCCESS;
+ }
+ 
++int cthd_sysfs_cdev_rapl::rapl_update_pl2_time_window(int time_window)
++{
++	std::stringstream temp_time_str;
++
++	temp_time_str << "constraint_" << pl2_index << "_time_window_us";
++
++	if (cdev_sysfs.write(temp_time_str.str(), time_window) <= 0) {
++		thd_log_info(
++				"pkg_power: powercap RAPL time window failed to write %d \n",
++				time_window);
++		return THD_ERROR;
++	}
++
++	return THD_SUCCESS;
++}
++
+ int cthd_sysfs_cdev_rapl::rapl_update_enable_status(int enable)
+ {
+ 	std::stringstream temp_str;
+@@ -359,9 +388,20 @@ int cthd_sysfs_cdev_rapl::update() {
+ 		dynamic_phy_max_enable = true;
+ 		//set_debounce_interval(1);
+ 
+-		// By default enable the rapl device to enforce any power limits
+-		rapl_update_enable_status(1);
+-
++		// Some system has PL2 limit as 0, then try to set PL2 limit also
++		if (!rapl_read_pl2()) {
++			thd_log_info("PL2 power limit is 0, will conditionally enable\n");
++			if (pl1_max_pwr) {
++				thd_log_info("PL2 limits are updated to %d %d\n", pl1_max_pwr,
++						pl1_max_window);
++				rapl_update_pl2(pl1_max_pwr);
++				rapl_update_pl2_time_window(pl1_max_window);
++				rapl_update_enable_status(1);
++			}
++		} else {
++			// By default enable the rapl device to enforce any power limits
++			rapl_update_enable_status(1);
++		}
+ 	} else {
+ 
+ 		// This is not a DPTF platform
+@@ -440,6 +480,15 @@ bool cthd_sysfs_cdev_rapl::read_ppcc_power_limits() {
+ 		pl0_max_window = ppcc->time_wind_max * 1000;
+ 		pl0_step_pwr = ppcc->step_size * 1000;
+ 
++		pl1_valid = ppcc->limit_1_valid;
++		if (pl1_valid) {
++			pl1_max_pwr = ppcc->power_limit_1_max * 1000;
++			pl1_min_pwr = ppcc->power_limit_1_min * 1000;
++			pl1_min_window = ppcc->time_wind_1_min * 1000;
++			pl1_max_window = ppcc->time_wind_1_max * 1000;
++			pl1_step_pwr = ppcc->step_1_size * 1000;
++		}
++
+ 		if (pl0_max_pwr <= pl0_min_pwr) {
+ 			thd_log_info("Invalid limits: ppcc limits max:%u min:%u  min_win:%u step:%u\n",
+ 					pl0_max_pwr, pl0_min_pwr, pl0_min_window, pl0_step_pwr);
+diff --git a/src/thd_cdev_rapl.h b/src/thd_cdev_rapl.h
+index 358f3b1..39b7dbb 100644
+--- a/src/thd_cdev_rapl.h
++++ b/src/thd_cdev_rapl.h
+@@ -40,6 +40,12 @@ protected:
+ 	int pl0_min_window;
+ 	int pl0_max_window;
+ 	int pl0_step_pwr;
++	int pl1_max_pwr;
++	int pl1_min_pwr;
++	int pl1_min_window;
++	int pl1_max_window;
++	int pl1_step_pwr;
++	int pl1_valid;
+ 	bool bios_locked;
+ 	bool constrained;
+ 	int power_on_constraint_0_pwr;
+@@ -53,9 +59,11 @@ private:
+ 	int rapl_read_pl1();
+ 	int rapl_read_pl1_max();
+ 	int rapl_update_pl1(int pl1);
+-	int rapl_update_pl2(int pl2);	
++	int rapl_read_pl2();
++	int rapl_update_pl2(int pl2);
+ 	int rapl_read_time_window();
+ 	int rapl_update_time_window(int time_window);
++	int rapl_update_pl2_time_window(int time_window);
+ 	int rapl_read_enable_status();
+ 	int rapl_update_enable_status(int enable);
+ 
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 3ce1628..fa1ecaf 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -482,6 +482,21 @@ int cthd_engine_adaptive::parse_ppcc(char *name, char *buf, int len) {
+ 	ppcc.step_size = *(uint64_t*) (buf + 76);
+ 	ppcc.valid = 1;
+ 
++	if (len < 156)
++		return 0;
++
++	thd_log_info("Processing ppcc limit 2, length %d\n", len);
++	int start = 76 + 12;
++	ppcc.power_limit_1_min = *(uint64_t*) (buf + start + 12);
++	ppcc.power_limit_1_max = *(uint64_t*) (buf + start + 24);
++	ppcc.time_wind_1_min = *(uint64_t*) (buf + start + 36);
++	ppcc.time_wind_1_max = *(uint64_t*) (buf + start + 48);
++	ppcc.step_1_size = *(uint64_t*) (buf + start + 60);
++
++	if (ppcc.power_limit_1_max && ppcc.power_limit_1_min && ppcc.time_wind_1_min
++			&& ppcc.time_wind_1_max && ppcc.step_1_size)
++		ppcc.limit_1_valid = 1;
++
+ 	ppccs.push_back(ppcc);
+ 
+ 	return 0;
+@@ -492,10 +507,15 @@ void cthd_engine_adaptive::dump_ppcc()
+ 	thd_log_info("..ppcc dump begin.. \n");
+ 	for (unsigned int i = 0; i < ppccs.size(); ++i) {
+ 		thd_log_info(
+-				"Name:%s power_limit_max:%d power_limit_min:%d step_size:%d time_win_max:%d time_win_min:%d\n",
++				"Name:%s Limit:0 power_limit_max:%d power_limit_min:%d step_size:%d time_win_max:%d time_win_min:%d\n",
+ 				ppccs[i].name.c_str(), ppccs[i].power_limit_max,
+ 				ppccs[i].power_limit_min, ppccs[i].step_size,
+ 				ppccs[i].time_wind_max, ppccs[i].time_wind_min);
++		thd_log_info(
++				"Name:%s Limit:1 power_limit_max:%d power_limit_min:%d step_size:%d time_win_max:%d time_win_min:%d\n",
++				ppccs[i].name.c_str(), ppccs[i].power_limit_1_max,
++				ppccs[i].power_limit_1_min, ppccs[i].step_1_size,
++				ppccs[i].time_wind_1_max, ppccs[i].time_wind_1_min);
+ 	}
+ 	thd_log_info("ppcc dump end\n");
+ }
+diff --git a/src/thd_parse.cpp b/src/thd_parse.cpp
+index 5c5745b..cc29609 100644
+--- a/src/thd_parse.cpp
++++ b/src/thd_parse.cpp
+@@ -606,6 +606,7 @@ int cthd_parse::parse_new_platform(xmlNode * a_node, xmlDoc *doc,
+ 				info.zones.clear();
+ 				info.polling_interval = 0;
+ 				info.ppcc.valid = 0;
++				info.ppcc.limit_1_valid = 0;
+ 				parse_new_platform_info(cur_node->children, doc, &info);
+ 				thermal_info_list.push_back(info);
+ 			}
+diff --git a/src/thd_parse.h b/src/thd_parse.h
+index 6a79de5..92611ac 100644
+--- a/src/thd_parse.h
++++ b/src/thd_parse.h
+@@ -129,6 +129,13 @@ typedef struct {
+ 	int time_wind_min;
+ 	int time_wind_max;
+ 	int step_size;
++
++	int limit_1_valid;
++	int power_limit_1_min;
++	int power_limit_1_max;
++	int time_wind_1_min;
++	int time_wind_1_max;
++	int step_1_size;
+ } ppcc_t;
+ 
+ typedef struct {
+-- 
+2.27.0
+

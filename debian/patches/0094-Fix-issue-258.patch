@@ -1,0 +1,30 @@
+From 3882a5b77adf4555dc9a68d8aee31cec66da6e28 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Thu, 20 Aug 2020 11:57:23 -0700
+Subject: [PATCH 094/134] Fix issue #258
+
+Fix issue by setting  ppcc.valid.
+
+(cherry picked from commit 691c4a94f00b0091964ada2bc7c7acaa6ceeaac8)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 5c507a1f13815c70852371aeec00185da43ed1c8)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 32cab4b..82a290d 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -438,6 +438,7 @@ int cthd_engine_adaptive::parse_ppcc(char *name, char *buf, int len) {
+ 	ppcc.time_wind_min = *(uint64_t*) (buf + 52);
+ 	ppcc.time_wind_max = *(uint64_t*) (buf + 64);
+ 	ppcc.step_size = *(uint64_t*) (buf + 76);
++	ppcc.valid = 1;
+ 
+ 	ppccs.push_back(ppcc);
+ 
+-- 
+2.27.0
+

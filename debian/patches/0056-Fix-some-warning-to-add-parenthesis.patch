@@ -1,0 +1,38 @@
+From bd857941984b50489fa620f0230e70872f37a54f Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 31 Jul 2020 16:51:44 -0700
+Subject: [PATCH 056/134] Fix some warning to add parenthesis
+
+(cherry picked from commit 91a567ce19bd606e1ef4a6f4ae5815692201cc5f)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 1a95e0337e1b5b91aec63d1276adc9a6674e5e6e)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/thd_engine.cpp b/src/thd_engine.cpp
+index f99190e..8457f73 100644
+--- a/src/thd_engine.cpp
++++ b/src/thd_engine.cpp
+@@ -118,7 +118,7 @@ void cthd_engine::thd_engine_thread() {
+ 			pthread_mutex_unlock(&thd_engine_mutex);
+ 			thz_last_temp_ind_time = tm;
+ 		}
+-		if (uevent_fd >= 0 && poll_fds[uevent_fd].revents & POLLIN) {
++		if (uevent_fd >= 0 && (poll_fds[uevent_fd].revents & POLLIN)) {
+ 			// Kobj uevent
+ 			if (kobj_uevent.check_for_event()) {
+ 				time_t tm;
+@@ -139,7 +139,7 @@ void cthd_engine::thd_engine_thread() {
+ 				thz_last_uevent_time = tm;
+ 			}
+ 		}
+-		if (wakeup_fd >= 0 && poll_fds[wakeup_fd].revents & POLLIN) {
++		if (wakeup_fd >= 0 && (poll_fds[wakeup_fd].revents & POLLIN)) {
+ 			message_capsul_t msg;
+ 
+ 			thd_log_debug("wakeup fd event\n");
+-- 
+2.27.0
+

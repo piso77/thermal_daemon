@@ -1,0 +1,31 @@
+From 813473218650cd4dc14d435a24e8799ffe5e12e5 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sun, 12 Apr 2020 15:31:24 -0700
+Subject: [PATCH 040/134] Harden APAT parsing
+
+Make sure we don't inappropriately walk off the end of the APAT table.
+
+(cherry picked from commit 7d7e44b07471a2dd4d6363cb4e6dbf95d7eff45a)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit ba8a96b22ec52fa52bf73fd9aec400415f1b2382)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index e77adc9..40af16b 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -128,7 +128,7 @@ int cthd_engine_adaptive::parse_apat (char *apat, int len) {
+ 	if (version != 2)
+ 		thd_log_fatal("Found unsupported APAT version %d\n", (int)version);
+ 
+-        while (1) {
++        while (offset < len) {
+ 		struct adaptive_target target;
+ 
+                 if (offset >= len)
+-- 
+2.27.0
+

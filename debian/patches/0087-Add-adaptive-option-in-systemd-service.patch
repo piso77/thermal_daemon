@@ -1,0 +1,31 @@
+From 1c74679eaeb74584b9387aec20766994dd5be6e5 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Mon, 3 Aug 2020 17:07:19 -0700
+Subject: [PATCH 087/134] Add adaptive option in systemd service
+
+Add adaptive option by default.
+
+(cherry picked from commit f3ee9bec72b496c2469edb78881dfe9713d0f4d5)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit d20e5444cb3a525052f747ab9ff84c414ec41f7b)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ data/thermald.service.in | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/data/thermald.service.in b/data/thermald.service.in
+index 1831c7a..f4416b0 100644
+--- a/data/thermald.service.in
++++ b/data/thermald.service.in
+@@ -6,7 +6,7 @@ ConditionVirtualization=no
+ Type=dbus
+ SuccessExitStatus=1
+ BusName=org.freedesktop.thermald
+-ExecStart=@sbindir@/thermald --systemd --dbus-enable
++ExecStart=@sbindir@/thermald --systemd --dbus-enable --adaptive
+ 
+ [Install]
+ WantedBy=multi-user.target
+-- 
+2.27.0
+

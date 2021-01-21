@@ -1,0 +1,73 @@
+From a3f1e926372e0207326db627bc41baffbf5ce3cd Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sun, 12 Apr 2020 18:14:55 -0700
+Subject: [PATCH 045/134] Add power source condition
+
+Add support for conditions that depend on whether the system is on AC or not
+
+(cherry picked from commit d9e5c4696a041ab552f9993680605dc156184712)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit affea382efabffd13d6790638ea093f1763f9476)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 17 +++++++++++++++++
+ src/thd_engine_adaptive.h   |  1 +
+ 2 files changed, 18 insertions(+)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 1c191af..ce4f39d 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -463,6 +463,8 @@ int cthd_engine_adaptive::verify_condition(struct condition condition) {
+ 	}
+ 	if (condition.condition == Lid_state && upower_client != NULL)
+ 		return 0;
++	if (condition.condition == Power_source && upower_client != NULL)
++		return 0;
+ 
+ 	thd_log_error("Unsupported condition %d\n", condition.condition);
+ 	return THD_ERROR;
+@@ -566,6 +568,17 @@ int cthd_engine_adaptive::evaluate_lid_condition(struct condition condition) {
+ 
+ 	return compare_condition(condition, value);
+ }
++
++int cthd_engine_adaptive::evaluate_ac_condition(struct condition condition) {
++	int value = 0;
++	bool on_battery = up_client_get_on_battery(upower_client);
++
++	if (on_battery)
++		value = 1;
++
++	return compare_condition(condition, value);
++}
++
+ int cthd_engine_adaptive::evaluate_condition(struct condition condition) {
+ 	if (condition.condition == Default)
+ 		return THD_SUCCESS;
+@@ -586,6 +599,10 @@ int cthd_engine_adaptive::evaluate_condition(struct condition condition) {
+ 		return evaluate_lid_condition(condition);
+ 	}
+ 
++	if (condition.condition == Power_source) {
++		return evaluate_ac_condition(condition);
++	}
++
+ 	return THD_ERROR;
+ }
+ 
+diff --git a/src/thd_engine_adaptive.h b/src/thd_engine_adaptive.h
+index bb44021..ac601be 100644
+--- a/src/thd_engine_adaptive.h
++++ b/src/thd_engine_adaptive.h
+@@ -169,6 +169,7 @@ protected:
+ 	int compare_condition(struct condition condition, int value);
+ 	int evaluate_oem_condition(struct condition condition);
+ 	int evaluate_temperature_condition(struct condition condition);
++	int evaluate_ac_condition(struct condition condition);
+ 	int evaluate_lid_condition(struct condition condition);
+ 	int evaluate_condition(struct condition condition);
+ 	int evaluate_condition_set(std::vector<struct condition> condition_set);
+-- 
+2.27.0
+

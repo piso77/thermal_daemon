@@ -1,0 +1,109 @@
+From a7571bec84a00fdf391ea61a3cfa3674083721aa Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 24 Jul 2020 17:29:44 -0700
+Subject: [PATCH 066/134] Logging optimization for debug
+
+Remove some logs for info level message for help in debug.
+
+(cherry picked from commit f9ba9a7809d73a163fc9b435d36041b370fd8b14)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit d5ecafb6f7fe8a99625d09015d6bca7dfb1a3eab)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_cdev.cpp       | 7 ++++---
+ src/thd_trip_point.cpp | 6 +++---
+ src/thd_zone.cpp       | 6 ------
+ src/thd_zone.h         | 2 +-
+ 4 files changed, 8 insertions(+), 13 deletions(-)
+
+diff --git a/src/thd_cdev.cpp b/src/thd_cdev.cpp
+index 190eff9..ce5904e 100644
+--- a/src/thd_cdev.cpp
++++ b/src/thd_cdev.cpp
+@@ -197,7 +197,8 @@ int cthd_cdev::thd_cdev_set_state(int set_point, int target_temp,
+ 	}
+ 
+ 	time(&tm);
+-	thd_log_info(
++
++	thd_log_debug(
+ 			">>thd_cdev_set_state temperature %d:%d index:%d state:%d :zone:%d trip_id:%d target_state_valid:%d target_value :%d force:%d\n",
+ 			target_temp, temperature, index, state, zone_id, trip_id,
+ 			target_state_valid, target_value, force);
+@@ -250,7 +251,7 @@ int cthd_cdev::thd_cdev_set_state(int set_point, int target_temp,
+ 				&& cmp_current_state(
+ 						map_target_state(target_state_valid, target_value))
+ 						<= 0) {
+-			thd_log_info("Already more constraint\n");
++			thd_log_debug("Already more constraint\n");
+ 			return THD_SUCCESS;
+ 		}
+ 
+@@ -296,7 +297,7 @@ int cthd_cdev::thd_cdev_set_state(int set_point, int target_temp,
+ 				// lower control is still active.
+ 				if (!erased)
+ 				{
+-					thd_log_info(
++					thd_log_debug(
+ 							"Currently active limit by [%d: %d %d %d]: ignore\n",
+ 							zone_id, trip_id, target_state_valid, target_value);
+ 					return THD_SUCCESS;
+diff --git a/src/thd_trip_point.cpp b/src/thd_trip_point.cpp
+index e2bc2f7..4b1abf8 100644
+--- a/src/thd_trip_point.cpp
++++ b/src/thd_trip_point.cpp
+@@ -241,7 +241,7 @@ bool cthd_trip_point::thd_trip_point_check(int id, unsigned int read_temp,
+ 				time_t tm;
+ 				time(&tm);
+ 				if ((tm - cdevs[i].last_op_time) < cdevs[i].sampling_priod) {
+-					thd_log_info("Too early to act zone:%d index %d tm %jd\n",
++					thd_log_debug("Too early to act zone:%d index %d tm %jd\n",
+ 							zone_id, cdev->thd_cdev_get_index(),
+ 							(intmax_t)tm - cdevs[i].last_op_time);
+ 					break;
+@@ -348,10 +348,10 @@ int cthd_trip_point::thd_trip_point_add_cdev_index(int _index, int influence) {
+ }
+ 
+ void cthd_trip_point::thd_trip_cdev_state_reset() {
+-	thd_log_info("thd_trip_cdev_state_reset \n");
++	thd_log_debug("thd_trip_cdev_state_reset \n");
+ 	for (int i = cdevs.size() - 1; i >= 0; --i) {
+ 		cthd_cdev *cdev = cdevs[i].cdev;
+-		thd_log_info("thd_trip_cdev_state_reset index %d:%s\n",
++		thd_log_debug("thd_trip_cdev_state_reset index %d:%s\n",
+ 				cdev->thd_cdev_get_index(), cdev->get_cdev_type().c_str());
+ 		if (cdev->in_min_state()) {
+ 			thd_log_debug("Need to switch to next cdev \n");
+diff --git a/src/thd_zone.cpp b/src/thd_zone.cpp
+index af8264f..4dc4ba4 100644
+--- a/src/thd_zone.cpp
++++ b/src/thd_zone.cpp
+@@ -121,12 +121,6 @@ void cthd_zone::sort_and_update_poll_trip() {
+ 		unsigned int polling_trip = 0;
+ 
+ 		std::sort(trip_points.begin(), trip_points.end(), trip_sort);
+-		thd_log_info("Sorted trip dump zone index:%d type:%s:\n", index,
+-				type_str.c_str());
+-		for (unsigned int i = 0; i < trip_points.size(); ++i) {
+-			trip_points[i].trip_dump();
+-		}
+-
+ 		if (trip_points.size())
+ 			polling_trip = trip_points[0].get_trip_temp();
+ 
+diff --git a/src/thd_zone.h b/src/thd_zone.h
+index 01bf627..b3ab500 100644
+--- a/src/thd_zone.h
++++ b/src/thd_zone.h
+@@ -108,7 +108,7 @@ public:
+ 	}
+ 
+ 	void zone_cdev_set_binded() {
+-		thd_log_info("zone %s bounded \n", type_str.c_str());
++		thd_log_debug("zone %s bounded \n", type_str.c_str());
+ 		zone_cdev_binded_status = true;
+ 	}
+ 
+-- 
+2.27.0
+

@@ -1,0 +1,36 @@
+From 5355d6c0294f0e233911701c44d68afd558960b4 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 20 Nov 2020 12:20:31 -0800
+Subject: [PATCH 127/134] Exit early on unsupported platforms
+
+Since on some Thinkpad models, thermald must exit. Do this check
+early without looking at adaptive tables.
+
+(cherry picked from commit 35c0e6ac066821adc26f02cfda990e654abeccba)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 05eaaaeb86ebce928373735e1ec18ffc7e4a1b17)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 024ed5f..b2e427b 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -1503,6 +1503,12 @@ int cthd_engine_adaptive::thd_engine_start(bool ignore_cpuid_check) {
+ 	csys_fs sysfs("/sys/");
+ 	size_t size;
+ 
++	check_cpu_id();
++	if (!processor_id_match()) {
++		thd_log_msg("Unsupported cpu model or platform\n");
++		exit(EXIT_SUCCESS);
++	}
++
+ 	csys_fs _sysfs("/tmp/ignore_adaptive");
+ 	if (_sysfs.exists()) {
+ 		return THD_ERROR;
+-- 
+2.27.0
+

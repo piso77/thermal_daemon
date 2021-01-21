@@ -1,0 +1,73 @@
+From 27e77beb6900c473b7fcf7f7d4fe3913b08cf9c5 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sat, 11 Apr 2020 16:21:10 -0700
+Subject: [PATCH 030/134] Enable and disable the INT3400 thermal zone
+
+The firmware doesn't pay attention to the configured UUID in the INT3400
+device until _OSC is called, and this only happens when we enable the
+associated thermal zone. Make sure we do so, and disable it again on exit.
+
+(cherry picked from commit 86ab619cfbfb749b26b9f0e9d07fd32f356724fe)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 41f1cb590c863c5af2995860da9bc27b42f1cee3)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine.cpp | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/src/thd_engine.cpp b/src/thd_engine.cpp
+index e4c4ef1..f99190e 100644
+--- a/src/thd_engine.cpp
++++ b/src/thd_engine.cpp
+@@ -550,6 +550,9 @@ void cthd_engine::takeover_thermal_control() {
+ 				i = atoi(entry->d_name + strlen("thermal_zone"));
+ 				std::stringstream policy;
+ 				std::string curr_policy;
++				std::stringstream type;
++				std::string thermal_type;
++				std::stringstream mode;
+ 
+ 				policy << "thermal_zone" << i << "/policy";
+ 				if (sysfs.exists(policy.str().c_str())) {
+@@ -557,6 +560,15 @@ void cthd_engine::takeover_thermal_control() {
+ 					zone_preferences.push_back(curr_policy);
+ 					sysfs.write(policy.str(), "user_space");
+ 				}
++				type << "thermal_zone" << i << "/type";
++				if (sysfs.exists(type.str().c_str())) {
++					sysfs.read(type.str(), thermal_type);
++					thd_log_info("Thermal zone of type %s\n", thermal_type.c_str());
++					if (thermal_type == "INT3400") {
++						mode << "thermal_zone" << i << "/mode";
++						sysfs.write(mode.str(), "enabled");
++					}
++				}
+ 			}
+ 		}
+ 		closedir(dir);
+@@ -586,11 +598,22 @@ void cthd_engine::giveup_thermal_control() {
+ 
+ 				i = atoi(entry->d_name + strlen("thermal_zone"));
+ 				std::stringstream policy;
++				std::stringstream type;
++				std::string thermal_type;
++				std::stringstream mode;
+ 
+ 				policy << "thermal_zone" << i << "/policy";
+ 				if (sysfs.exists(policy.str().c_str())) {
+ 					sysfs.write(policy.str(), zone_preferences[cnt++]);
+ 				}
++				type << "thermal_zone" << i << "/type";
++				if (sysfs.exists(type.str().c_str())) {
++					sysfs.read(type.str(), thermal_type);
++					if (thermal_type == "INT3400") {
++						mode << "thermal_zone" << i << "/mode";
++						sysfs.write(mode.str(), "disabled");
++					}
++				}
+ 			}
+ 		}
+ 		closedir(dir);
+-- 
+2.27.0
+

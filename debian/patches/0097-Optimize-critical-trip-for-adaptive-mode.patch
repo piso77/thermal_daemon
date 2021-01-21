@@ -1,0 +1,143 @@
+From 079c80d1a71e4ec71a4f7f531f8e9ef7ed1644ab Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Thu, 20 Aug 2020 15:04:03 -0700
+Subject: [PATCH 097/134] Optimize critical trip for adaptive mode
+
+Adaptive mode is enabling exclusive control, which will cause
+crtitical trip from thermal zone to be used. To prevent reboot
+on one event, use count of violations, to reboot.
+
+Also adding command line option to ignore critical trips.
+
+(cherry picked from commit e6cf3b5afebc26333c279bad8af44accf1c67945)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit a1b48daf7f07515ea0bb44b8e2cbafe07148e015)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/android_main.cpp   |  1 +
+ src/main.cpp           |  4 ++++
+ src/thd_trip_point.cpp | 19 ++++++++++++++++---
+ src/thd_trip_point.h   |  3 +++
+ src/thermald.h         |  1 +
+ 5 files changed, 25 insertions(+), 3 deletions(-)
+
+diff --git a/src/android_main.cpp b/src/android_main.cpp
+index 9b138b9..fe30e69 100644
+--- a/src/android_main.cpp
++++ b/src/android_main.cpp
+@@ -52,6 +52,7 @@ int thd_poll_interval = 4; //in seconds
+ bool thd_ignore_default_control = false;
+ bool workaround_enabled = false;
+ bool disable_active_power = false;
++bool ignore_critical = false;
+ 
+ static int pid_file_handle;
+ 
+diff --git a/src/main.cpp b/src/main.cpp
+index 6c1b5aa..a5cff47 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -74,6 +74,7 @@ int thd_poll_interval = 4; //in seconds
+ bool thd_ignore_default_control = false;
+ bool workaround_enabled = false;
+ bool disable_active_power = false;
++bool ignore_critical = false;
+ 
+ // check cpuid
+ static gboolean ignore_cpuid_check = false;
+@@ -223,6 +224,9 @@ int main(int argc, char *argv[]) {
+ 			{ "disable-active-power", 0, 0, G_OPTION_ARG_NONE,
+ 						&disable_active_power, N_(
+ 						"Disable active power settings to reduce thermal impact"), NULL },
++			{ "ignore-critical-trip", 0, 0, G_OPTION_ARG_NONE,
++						&ignore_critical, N_(
++						"Ignore critical trips for reboot"), NULL },
+ 			{ NULL, 0, 0,
+ 					G_OPTION_ARG_NONE, NULL, NULL, NULL } };
+ 
+diff --git a/src/thd_trip_point.cpp b/src/thd_trip_point.cpp
+index 2f45f5b..159cfe1 100644
+--- a/src/thd_trip_point.cpp
++++ b/src/thd_trip_point.cpp
+@@ -35,7 +35,7 @@ int _temp, unsigned int _hyst, int _zone_id, int _sensor_id,
+ 		index(_index), type(_type), temp(_temp), hyst(_hyst), control_type(
+ 				_control_type), zone_id(_zone_id), sensor_id(_sensor_id), trip_on(
+ 				false), poll_on(false), depend_cdev(NULL), depend_cdev_state(0), depend_cdev_state_rel(
+-				EQUAL) {
++				EQUAL), crit_trip_count(0) {
+ 	thd_log_debug("Add trip pt %d:%d:0x%x:%d:%d\n", type, zone_id, sensor_id,
+ 			temp, hyst);
+ }
+@@ -144,8 +144,13 @@ bool cthd_trip_point::thd_trip_point_check(int id, unsigned int read_temp,
+ 	if (type == CRITICAL) {
+ 		int ret = -1;
+ 
+-		if (read_temp >= temp) {
++		if (!ignore_critical && read_temp >= temp) {
+ 			thd_log_warn("critical temp reached \n");
++			if (crit_trip_count < consecutive_critical_events) {
++				++crit_trip_count;
++				return true;
++			}
++			crit_trip_count = 0;
+ 			sync();
+ #ifdef ANDROID
+ 			ret = property_set("sys.powerctl", "shutdown,thermal");
+@@ -160,14 +165,22 @@ bool cthd_trip_point::thd_trip_point_check(int id, unsigned int read_temp,
+ 
+ 			return true;
+ 		}
++		crit_trip_count = 0;
+ 	}
+ 	if (type == HOT) {
+-		if (read_temp >= temp) {
++		if (!ignore_critical && read_temp >= temp) {
++			thd_log_warn("Hot temp reached \n");
++			if (crit_trip_count < consecutive_critical_events) {
++				++crit_trip_count;
++				return true;
++			}
++			crit_trip_count = 0;
+ 			thd_log_warn("Hot temp reached \n");
+ 			csys_fs power("/sys/power/");
+ 			power.write("state", "mem");
+ 			return true;
+ 		}
++		crit_trip_count = 0;
+ 	}
+ 
+ 	if (type == POLLING && sensor_id != DEFAULT_SENSOR_ID) {
+diff --git a/src/thd_trip_point.h b/src/thd_trip_point.h
+index a1818d1..e816251 100644
+--- a/src/thd_trip_point.h
++++ b/src/thd_trip_point.h
+@@ -87,6 +87,7 @@ private:
+ 	cthd_cdev *depend_cdev;
+ 	int depend_cdev_state;
+ 	trip_point_cdev_depend_rel_t depend_cdev_state_rel;
++	int crit_trip_count;
+ 
+ 	bool check_duplicate(cthd_cdev *cdev, int *index) {
+ 		for (unsigned int i = 0; i < cdevs.size(); ++i) {
+@@ -100,6 +101,8 @@ private:
+ 
+ public:
+ 	static const int default_influence = 0;
++	static const int consecutive_critical_events = 4;
++
+ 	cthd_trip_point(int _index, trip_point_type_t _type, unsigned int _temp,
+ 			unsigned int _hyst, int _zone_id, int _sensor_id,
+ 			trip_control_type_t _control_type = PARALLEL);
+diff --git a/src/thermald.h b/src/thermald.h
+index 6588d0a..45ee3b1 100644
+--- a/src/thermald.h
++++ b/src/thermald.h
+@@ -112,4 +112,5 @@ extern int thd_poll_interval;
+ extern bool thd_ignore_default_control;
+ extern bool workaround_enabled;
+ extern bool disable_active_power;
++extern bool ignore_critical;
+ #endif
+-- 
+2.27.0
+

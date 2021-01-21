@@ -1,0 +1,41 @@
+From 4e00721e646c58f89c233fdeb8f9c6986748bf79 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Wed, 18 Nov 2020 12:26:52 -0800
+Subject: [PATCH 124/134] Deal case where target.participant is empty
+
+Instead of totally fail to install PSVT and use limits from  sysfs
+use target.code == "PSVT" to install. In one Lenovo system, this
+is the case. Also sysf CPU temperature threshold is too low, which
+is not tested by OEM, so throttled to much lower value. So backup
+threshold also can't be used.
+
+(cherry picked from commit c8f6c7d09e644dd21412dce3cf600dd4d57b7a90)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit e4c4dbff9df74a11dc583c2d2b56960f014861db)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index fa1ecaf..b7709e7 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -1366,11 +1366,13 @@ void cthd_engine_adaptive::execute_target(struct adaptive_target target) {
+ 	else
+ 		name = target.participant.substr(pos + 1);
+ 	cdev = search_cdev(name);
++	thd_log_info("looking for cdev %s\n", name.c_str());
+ 	if (!cdev) {
++		thd_log_info("cdev %s not found\n", name.c_str());
+ 		if (target.participant == int3400_path) {
+ 			set_int3400_target(target);
++			return;
+ 		}
+-		return;
+ 	}
+ 
+ 	if (target.code == "PSVT") {
+-- 
+2.27.0
+

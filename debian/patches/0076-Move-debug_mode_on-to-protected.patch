@@ -1,0 +1,38 @@
+From d32eccea4ec956d1a108a0ede2c724db81e8b84a Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 24 Jul 2020 11:52:28 -0700
+Subject: [PATCH 076/134] Move debug_mode_on to protected
+
+This will allow to be used from adaptive engine.
+
+(cherry picked from commit 514ad5d6aaea7e5ba30b3be6aeaee91e1e984abb)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 913c5c56a82953dea591fe7606ce24a09f89baf5)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_default.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/thd_engine_default.h b/src/thd_engine_default.h
+index 31c8515..0fbf847 100644
+--- a/src/thd_engine_default.h
++++ b/src/thd_engine_default.h
+@@ -42,7 +42,6 @@ private:
+ 	int tcc_offset_checked;
+ 	int tcc_offset_low;
+ #endif
+-	int debug_mode_on(void);
+ 
+ protected:
+ 	bool force_mmio_rapl;
+@@ -75,6 +74,7 @@ public:
+ 	int read_cooling_devices();
+ 	int read_thermal_sensors();
+ 	void workarounds();
++	int debug_mode_on(void);
+ };
+ 
+ int thd_engine_create_default_engine(bool ignore_cpuid_check,
+-- 
+2.27.0
+

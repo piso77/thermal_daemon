@@ -1,0 +1,82 @@
+From db0b36aec9b84817c92bf2cca854bafa7dc6b127 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Wed, 8 Apr 2020 20:20:19 -0700
+Subject: [PATCH 022/134] Improve handling of large binary sysfs files
+
+If we're going to read a binary sysfs file, we want to know how big it is
+in advance. Add a helper to do that. In addition, add support for reading
+files greater than a single page.
+
+(cherry picked from commit 7c7a7607b7ab9f41c086962f2633d620f800a14d)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 50edc23d575475a02faebbbf00f9d37a58f3fb70)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_sys_fs.cpp | 25 +++++++++++++++++++++----
+ src/thd_sys_fs.h   |  1 +
+ 2 files changed, 22 insertions(+), 4 deletions(-)
+
+diff --git a/src/thd_sys_fs.cpp b/src/thd_sys_fs.cpp
+index d5b1c05..a195f6b 100644
+--- a/src/thd_sys_fs.cpp
++++ b/src/thd_sys_fs.cpp
+@@ -73,16 +73,24 @@ int csys_fs::write(const std::string &path, unsigned int data) {
+ int csys_fs::read(const std::string &path, char *buf, int len) {
+ 	std::string p = base_path + path;
+ 	int fd = ::open(p.c_str(), O_RDONLY);
++	int orig_len = len;
+ 	if (fd < 0) {
+ 		thd_log_warn("sysfs read failed %s\n", p.c_str());
+ 		return -errno;
+ 	}
+-	int ret = ::read(fd, buf, len);
+-	if (ret < 0)
+-		thd_log_warn("sysfs read failed %s\n", p.c_str());
++	while (len > 0) {
++		int ret = ::read(fd, buf, len);
++		if (ret < 0) {
++			thd_log_warn("sysfs read failed %s\n", p.c_str());
++			close(fd);
++			return ret;
++		}
++		buf += ret;
++		len -= ret;
++	}
+ 	close(fd);
+ 
+-	return ret;
++	return orig_len - len;
+ }
+ 
+ int csys_fs::read(const std::string &path, unsigned int position, char *buf,
+@@ -180,6 +188,15 @@ bool csys_fs::exists(const std::string &path) {
+ 	return (bool) (stat((base_path + path).c_str(), &s) == 0);
+ }
+ 
++size_t csys_fs::size(const std::string &path) {
++	struct stat s;
++
++	if (stat((base_path + path).c_str(), &s) == 0)
++		return s.st_size;
++
++	return 0;
++}
++
+ int csys_fs::create() {
+ 
+ 	int fd = ::open(base_path.c_str(), O_CREAT | O_WRONLY | O_TRUNC, S_IRWXU);
+diff --git a/src/thd_sys_fs.h b/src/thd_sys_fs.h
+index 537329e..ce6ce1e 100644
+--- a/src/thd_sys_fs.h
++++ b/src/thd_sys_fs.h
+@@ -69,6 +69,7 @@ public:
+ 
+ 	bool exists(const std::string &path);
+ 	bool exists();
++	size_t size(const std::string &path);
+ 	int create();
+ 	mode_t get_mode(const std::string &path);
+ 
+-- 
+2.27.0
+

@@ -1,0 +1,81 @@
+From fff12a6bd4447cc732c981c143d33beb20925227 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sun, 12 Apr 2020 02:19:14 -0700
+Subject: [PATCH 034/134] Harden PSVT parsing
+
+PSVT entries may have a uint64 rather than a string for the target argument,
+so make sure we handle that and also deal with cases where we have multiple
+PSVTs in the parent object rather than in the shared space by passing
+through a unique name.
+
+(cherry picked from commit 29a1c14dbb19f0be3e916550db87c68e7bc98f56)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit d1096a88b58c35ea4aa4d0f9f8a64ccddd158fc4)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 17 ++++++++++++++---
+ src/thd_engine_adaptive.h   |  1 +
+ 2 files changed, 15 insertions(+), 3 deletions(-)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index bb00bc5..b2f4a03 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -37,6 +37,10 @@ struct header {
+ cthd_engine_adaptive::~cthd_engine_adaptive() {
+ }
+ 
++int cthd_engine_adaptive::get_type(char *object, int *offset) {
++	return *(uint32_t *)(object + *offset);
++}
++
+ uint64_t cthd_engine_adaptive::get_uint64(char *object, int *offset) {
+         uint64_t value;
+         int type = *(uint32_t *)(object + *offset);
+@@ -248,7 +252,12 @@ int cthd_engine_adaptive::parse_psvt(char *name, char *buf, int len) {
+ 	psvt.temp = get_uint64(buf, &offset);
+ 	psvt.domain = get_uint64(buf, &offset);
+ 	psvt.control_knob = get_uint64(buf, &offset);
+-	psvt.limit = get_string(buf, &offset);
++	if (get_type(buf, &offset) == 8) {
++		psvt.limit = get_string(buf, &offset);
++	} else {
++		uint64_t tmp = get_uint64(buf, &offset);
++		psvt.limit = std::to_string(tmp);
++	}
+ 	psvt.step_size = get_uint64(buf, &offset);
+ 	psvt.limit_coeff = get_uint64(buf, &offset);
+ 	psvt.unlimit_coeff = get_uint64(buf, &offset);
+@@ -348,13 +357,15 @@ int cthd_engine_adaptive::parse_gddv(char *buf, int size) {
+                                 point = strtok(NULL, "/");
+                         }
+                 }
+-
+ 		if (type && strcmp(type, "ppcc") == 0) {
+                         parse_ppcc(name, val, vallength);
+                 }
+ 
+                 if (type && strcmp(type, "psvt") == 0) {
+-			parse_psvt(point, val, vallength);
++			if (point == NULL)
++				parse_psvt(name, val, vallength);
++			else
++				parse_psvt(point, val, vallength);
+                 }
+ 
+                 if (type && strcmp(type, "appc") == 0) {
+diff --git a/src/thd_engine_adaptive.h b/src/thd_engine_adaptive.h
+index d429bb1..a5c6a7c 100644
+--- a/src/thd_engine_adaptive.h
++++ b/src/thd_engine_adaptive.h
+@@ -132,6 +132,7 @@ protected:
+ 	std::vector<struct adaptive_target> targets;
+ 	std::vector<struct psvt> psvts;
+ 	std::string int3400_path;
++	int get_type(char *object, int *offset);
+ 	uint64_t get_uint64(char *object, int *offset);
+ 	char *get_string(char *object, int *offset);
+ 	int parse_appc(char *appc, int len);
+-- 
+2.27.0
+

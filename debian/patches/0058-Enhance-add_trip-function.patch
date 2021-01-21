@@ -1,0 +1,132 @@
+From 4fa169568f2b5c4496dfd8550976a2f3227d8f33 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 24 Jul 2020 13:49:55 -0700
+Subject: [PATCH 058/134] Enhance add_trip function
+
+Add a mode so that new trip can be added without checking type.
+This will allow to add new trip of same type. This was always
+supported to add multiple trips, but not through this interface.
+
+In this process simply creating poll trip, by recreating everytime.
+This interface is called only during startup or during zone updte.
+Also use all trip types to decide the poll trip.
+
+(cherry picked from commit ac29f66f25448f23ea2847ee6f23fc8908f36b34)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 7f0eea0097f5f5b28277aeaf8e54f4ee2bbe115d)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_trip_point.h |  3 ---
+ src/thd_zone.cpp     | 47 +++++++++++++++++++-------------------------
+ src/thd_zone.h       |  2 +-
+ 3 files changed, 21 insertions(+), 31 deletions(-)
+
+diff --git a/src/thd_trip_point.h b/src/thd_trip_point.h
+index 4331559..a32e685 100644
+--- a/src/thd_trip_point.h
++++ b/src/thd_trip_point.h
+@@ -216,9 +216,6 @@ public:
+ };
+ 
+ static inline bool trip_sort(cthd_trip_point trip1, cthd_trip_point trip2) {
+-	if (trip1.get_trip_type() != trip2.get_trip_type())
+-		return false;
+-
+ 	return (trip1.get_trip_temp() < trip2.get_trip_temp());
+ }
+ #endif
+diff --git a/src/thd_zone.cpp b/src/thd_zone.cpp
+index b518f61..af8264f 100644
+--- a/src/thd_zone.cpp
++++ b/src/thd_zone.cpp
+@@ -108,6 +108,15 @@ int cthd_zone::read_user_set_psv_temp() {
+ void cthd_zone::sort_and_update_poll_trip() {
+ 	thd_log_debug("sort_and_update_poll_trip: trip_points_size =%zu\n",
+ 			trip_points.size());
++
++	for (unsigned int i = 0; i < trip_points.size(); ++i) {
++		if (trip_points[i].get_trip_type() == POLLING) {
++			thd_log_debug("polling trip already present\n");
++			trip_points.erase(trip_points.begin() + i);
++			break;
++		}
++	}
++
+ 	if (trip_points.size()) {
+ 		unsigned int polling_trip = 0;
+ 
+@@ -121,24 +130,6 @@ void cthd_zone::sort_and_update_poll_trip() {
+ 		if (trip_points.size())
+ 			polling_trip = trip_points[0].get_trip_temp();
+ 
+-		int poll_trip_present = 0;
+-		int poll_trip_index = 0;
+-		for (unsigned int i = 0; i < trip_points.size(); ++i) {
+-			if (trip_points[i].get_trip_type() == POLLING) {
+-				thd_log_debug("polling trip already present\n");
+-				poll_trip_present = 1;
+-				poll_trip_index = i;
+-			}
+-			if (trip_points[i].get_trip_type() == PASSIVE && polling_trip > trip_points[i].get_trip_temp())
+-				polling_trip = trip_points[i].get_trip_temp();
+-			thd_log_info("trip type: %d temp: %d \n",
+-					trip_points[i].get_trip_type(),
+-					trip_points[i].get_trip_temp());
+-		}
+-
+-		if (!polling_trip)
+-			return;
+-
+ 		unsigned int poll_offset = polling_trip * def_async_trip_offset_pct
+ 				/ 100;
+ 
+@@ -154,14 +145,10 @@ void cthd_zone::sort_and_update_poll_trip() {
+ 			sensor->set_threshold(0, polling_trip);
+ 			// If the poll trip is already present then simply update
+ 			// the trip, instead of creating a new one.
+-			if (poll_trip_present) {
+-				trip_points[poll_trip_index].update_trip_temp(polling_trip);
+-			} else {
+-				cthd_trip_point trip_pt_polling(trip_points.size(), POLLING,
+-						polling_trip, 0, index, sensor->get_index());
+-				trip_pt_polling.thd_trip_point_set_control_type(PARALLEL);
+-				trip_points.push_back(trip_pt_polling);
+-			}
++			cthd_trip_point trip_pt_polling(trip_points.size(), POLLING,
++					polling_trip, 0, index, sensor->get_index());
++			trip_pt_polling.thd_trip_point_set_control_type(PARALLEL);
++			trip_points.push_back(trip_pt_polling);
+ 		}
+ 	}
+ }
+@@ -303,7 +290,13 @@ int cthd_zone::update_psv_temperature(int psv_temp) {
+ 	return THD_SUCCESS;
+ }
+ 
+-void cthd_zone::add_trip(cthd_trip_point &trip) {
++void cthd_zone::add_trip(cthd_trip_point &trip, int force) {
++	if (force) {
++		trip_points.push_back(trip);
++		sort_and_update_poll_trip();
++		return;
++	}
++
+ 	bool add = true;
+ 	for (unsigned int j = 0; j < trip_points.size(); ++j) {
+ 		if (trip_points[j].get_trip_type() == trip.get_trip_type()) {
+diff --git a/src/thd_zone.h b/src/thd_zone.h
+index 52ee26a..01bf627 100644
+--- a/src/thd_zone.h
++++ b/src/thd_zone.h
+@@ -87,7 +87,7 @@ public:
+ 		return index;
+ 	}
+ 
+-	void add_trip(cthd_trip_point &trip);
++	void add_trip(cthd_trip_point &trip, int force = 0);
+ 	void update_trip_temp(cthd_trip_point &trip);
+ 	void update_highest_trip_temp(cthd_trip_point &trip);
+ 
+-- 
+2.27.0
+

@@ -1,0 +1,136 @@
+From 904e727755f0fb57b67f99d7108404d0d9d3f84d Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Wed, 15 Apr 2020 18:08:57 -0700
+Subject: [PATCH 051/134] Add support for conditions with time constraints
+
+Conditions can specify that a condition must have held for more than or less
+than a given period of time. Add support for that.
+
+(cherry picked from commit 48c2088cc08025ca1472fefbbb12fa585a8310e0)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 55b6858bee334a7de6cbd86d01d7ee1df2aad90e)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 54 +++++++++++++++++++++++++++++++------
+ src/thd_engine_adaptive.h   |  1 +
+ 2 files changed, 47 insertions(+), 8 deletions(-)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 2e4b68c..a20237c 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -517,6 +517,33 @@ int cthd_engine_adaptive::compare_condition(struct condition condition, int valu
+ 	}
+ }
+ 
++int cthd_engine_adaptive::compare_time(struct condition condition) {
++	int elapsed = time(NULL) - condition.state_entry_time;
++
++	switch (condition.time_comparison) {
++	case ADAPTIVE_EQUAL:
++		if (elapsed == condition.time)
++			return THD_SUCCESS;
++		else
++			return THD_ERROR;
++		break;
++	case ADAPTIVE_LESSER_OR_EQUAL:
++		if (elapsed <= condition.time)
++			return THD_SUCCESS;
++		else
++			return THD_ERROR;
++		break;
++	case ADAPTIVE_GREATER_OR_EQUAL:
++		if (elapsed >= condition.time)
++			return THD_SUCCESS;
++		else
++			return THD_ERROR;
++		break;
++	default:
++		return THD_ERROR;
++	}
++}
++
+ int cthd_engine_adaptive::evaluate_oem_condition(struct condition condition) {
+ 	csys_fs sysfs("/sys/bus/platform/devices/INT3400:00/");
+ 	int oem_condition = -1;
+@@ -563,7 +590,7 @@ int cthd_engine_adaptive::evaluate_temperature_condition(struct condition condit
+ 	// Conditions are specified in decikelvin, temperatures are in
+ 	// millicelsius.
+ 	value = value / 100 + 2732;
+-	return  compare_condition(condition, value);
++	return compare_condition(condition, value);
+ }
+ 
+ int cthd_engine_adaptive::evaluate_lid_condition(struct condition condition) {
+@@ -605,6 +632,8 @@ int cthd_engine_adaptive::evaluate_ac_condition(struct condition condition) {
+ }
+ 
+ int cthd_engine_adaptive::evaluate_condition(struct condition condition) {
++	int ret = THD_ERROR;
++
+ 	if (condition.condition == Default)
+ 		return THD_SUCCESS;
+ 
+@@ -612,31 +641,40 @@ int cthd_engine_adaptive::evaluate_condition(struct condition condition) {
+ 	    condition.condition <= Oem5) ||
+ 	    (condition.condition >= (adaptive_condition)0x1000 &&
+ 	     condition.condition < (adaptive_condition)0x10000))
+-		return evaluate_oem_condition(condition);
++		ret = evaluate_oem_condition(condition);
+ 
+ 	if (condition.condition == Temperature ||
+ 	    condition.condition == Temperature_without_hysteresis ||
+ 	    condition.condition == (adaptive_condition)0) {
+-		return evaluate_temperature_condition(condition);
++		ret = evaluate_temperature_condition(condition);
+ 	}
+ 
+ 	if (condition.condition == Lid_state) {
+-		return evaluate_lid_condition(condition);
++		ret = evaluate_lid_condition(condition);
+ 	}
+ 
+ 	if (condition.condition == Power_source) {
+-		return evaluate_ac_condition(condition);
++		ret = evaluate_ac_condition(condition);
+ 	}
+ 
+ 	if (condition.condition == Workload) {
+-		return evaluate_workload_condition(condition);
++		ret = evaluate_workload_condition(condition);
+ 	}
+ 
+ 	if (condition.condition == Platform_type) {
+-		return evaluate_platform_type_condition(condition);
++		ret = evaluate_platform_type_condition(condition);
+ 	}
+ 
+-	return THD_ERROR;
++	if (ret) {
++		if (condition.time && condition.state_entry_time == 0) {
++			condition.state_entry_time = time(NULL);
++		}
++		ret = compare_time(condition);
++	} else {
++		condition.state_entry_time = 0;
++	}
++
++	return ret;
+ }
+ 
+ int cthd_engine_adaptive::evaluate_condition_set(std::vector<struct condition> condition_set) {
+diff --git a/src/thd_engine_adaptive.h b/src/thd_engine_adaptive.h
+index 1ca8ce8..77790bf 100644
+--- a/src/thd_engine_adaptive.h
++++ b/src/thd_engine_adaptive.h
+@@ -169,6 +169,7 @@ protected:
+ 	int verify_condition(struct condition condition);
+ 	int verify_conditions();
+ 	int compare_condition(struct condition condition, int value);
++	int compare_time(struct condition condition);
+ 	int evaluate_oem_condition(struct condition condition);
+ 	int evaluate_temperature_condition(struct condition condition);
+ 	int evaluate_ac_condition(struct condition condition);
+-- 
+2.27.0
+

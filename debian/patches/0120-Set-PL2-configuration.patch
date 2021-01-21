@@ -1,0 +1,86 @@
+From df3719859d294a05d0743594e39ab6ec36ce97c1 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Wed, 15 Apr 2020 16:16:00 -0700
+Subject: [PATCH 120/134] Set PL2 configuration
+
+Add support for statically updating the PL2 configuration when requested.
+
+(cherry picked from commit 5d85f910cbb45ee8622342fde1f9ff00bde743da)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit c520f562ac5ccc9160bb5dad5234dea52bd30622)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_cdev_rapl.cpp | 22 ++++++++++++++++++++++
+ src/thd_cdev_rapl.h   |  2 ++
+ 2 files changed, 24 insertions(+)
+
+diff --git a/src/thd_cdev_rapl.cpp b/src/thd_cdev_rapl.cpp
+index 790566a..90c396a 100644
+--- a/src/thd_cdev_rapl.cpp
++++ b/src/thd_cdev_rapl.cpp
+@@ -140,6 +140,9 @@ int cthd_sysfs_cdev_rapl::rapl_sysfs_valid()
+ 				constraint_index = i;
+ 				found = 1;
+ 			}
++			if (type_str == "short_term") {
++				pl2_index = i;
++			}
+ 		}
+ 	}
+ 
+@@ -210,6 +213,23 @@ int cthd_sysfs_cdev_rapl::rapl_update_pl1(int pl1)
+ 	return THD_SUCCESS;
+ }
+ 
++int cthd_sysfs_cdev_rapl::rapl_update_pl2(int pl2)
++{
++	std::stringstream temp_power_str;
++	int ret;
++
++	temp_power_str << "constraint_" << pl2_index << "_power_limit_uw";
++	ret = cdev_sysfs.write(temp_power_str.str(), pl2);
++	if (ret <= 0) {
++		thd_log_info(
++				"pkg_power: powercap RAPL max power limit failed to write PL2 %d \n",
++				pl2);
++		return ret;
++	}
++
++	return THD_SUCCESS;
++}
++
+ int cthd_sysfs_cdev_rapl::rapl_read_time_window()
+ {
+ 	std::stringstream temp_time_str;
+@@ -295,6 +315,8 @@ void cthd_sysfs_cdev_rapl::set_adaptive_target(struct adaptive_target target) {
+ 		pl0_min_window = argument * 1000;
+ 	} else if (target.code == "PL1PowerLimit") {
+ 		set_curr_state(argument * 1000, 1);
++	} else if (target.code == "PL2PowerLimit") {
++		rapl_update_pl2(argument * 1000);
+ 	} else if (target.code == "TccOffset") {
+ 		set_tcc(argument);
+ 	}
+diff --git a/src/thd_cdev_rapl.h b/src/thd_cdev_rapl.h
+index eceb05e..79af385 100644
+--- a/src/thd_cdev_rapl.h
++++ b/src/thd_cdev_rapl.h
+@@ -33,6 +33,7 @@ protected:
+ 	int phy_max;
+ 	int package_id;
+ 	int constraint_index;
++	int pl2_index;
+ 	bool dynamic_phy_max_enable;
+ 	int pl0_max_pwr;
+ 	int pl0_min_pwr;
+@@ -52,6 +53,7 @@ private:
+ 	int rapl_read_pl1();
+ 	int rapl_read_pl1_max();
+ 	int rapl_update_pl1(int pl1);
++	int rapl_update_pl2(int pl2);	
+ 	int rapl_read_time_window();
+ 	int rapl_update_time_window(int time_window);
+ 	int rapl_read_enable_status();
+-- 
+2.27.0
+

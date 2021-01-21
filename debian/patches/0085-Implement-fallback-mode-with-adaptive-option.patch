@@ -1,0 +1,248 @@
+From b38a02ee69ba54a6d275fae3e8b48a01801a17c9 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 24 Jul 2020 12:57:26 -0700
+Subject: [PATCH 085/134] Implement fallback mode with --adaptive option
+
+Unless a distro ships with --adaptive option it is not likely that many users
+will use this. But since this option may fail, implement some fallback.
+
+Fallback method in order:
+
+- It is likely that unsupported conditions will exist. So in this
+case it is possible that some existing conditions are met, so
+evaluate and if successful, then continue to use this method.
+
+- If the above condition fails, then pick a target with highest PL1MAX.
+
+- If the above condition fails then fallback to old method of using
+XML, _TRT or default in built trips.
+
+(cherry picked from commit de039a47d3cd99d770a8b4ff1da6df1b61e4c081)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit a1836d7e9c7933243c478396db2da78bad17b340)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/main.cpp                | 13 ++++--
+ src/thd_engine_adaptive.cpp | 84 ++++++++++++++++++++++++++++++++-----
+ src/thd_engine_adaptive.h   |  8 +++-
+ 3 files changed, 90 insertions(+), 15 deletions(-)
+
+diff --git a/src/main.cpp b/src/main.cpp
+index 9b46f7f..6c1b5aa 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -332,11 +332,18 @@ int main(int argc, char *argv[]) {
+ 		}
+ 	}
+ 
+-	if (adaptive)
++	if (adaptive) {
+ 		ret = thd_engine_create_adaptive_engine((bool) ignore_cpuid_check);
+-	else
+-		ret = thd_engine_create_default_engine((bool) ignore_cpuid_check,
++		if (ret != THD_SUCCESS) {
++			thd_log_info("--adaptive option failed on this platform\n");
++			thd_log_info("Ignoring --adaptive option\n");
++			ret = thd_engine_create_default_engine((bool) ignore_cpuid_check,
+ 						       (bool) exclusive_control, conf_file);
++		}
++	} else {
++		ret = thd_engine_create_default_engine((bool) ignore_cpuid_check,
++					       (bool) exclusive_control, conf_file);
++	}
+ 	if (ret != THD_SUCCESS) {
+ 		clean_up_lockfile();
+ 		closelog();
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index b017906..2339e8b 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -713,7 +713,7 @@ int cthd_engine_adaptive::verify_conditions() {
+ 	}
+ 
+ 	if (result != 0)
+-		thd_log_error("Exiting due to unsupported conditions\n");
++		thd_log_error("Unsupported conditions are present\n");
+ 
+ 	return result;
+ }
+@@ -944,6 +944,9 @@ int cthd_engine_adaptive::evaluate_condition_set(
+ int cthd_engine_adaptive::evaluate_conditions() {
+ 	int target = -1;
+ 
++	if (fallback_id >= 0)
++		return -1;
++
+ 	for (int i = 0; i < (int) conditions.size(); i++) {
+ 		thd_log_debug("evaluate condition set %d\n", i);
+ 		if (evaluate_condition_set(conditions[i]) == THD_SUCCESS) {
+@@ -1239,10 +1242,24 @@ void cthd_engine_adaptive::execute_target(struct adaptive_target target) {
+ 	cdev->set_adaptive_target(target);
+ }
+ 
++void cthd_engine_adaptive::exec_fallback_target(int target){
++	thd_log_debug("exec_fallback_target %d\n", target);
++	for (int i = 0; i < (int) targets.size(); i++) {
++		if (targets[i].target_id != (uint64_t) target)
++			continue;
++		execute_target(targets[i]);
++	}
++}
++
+ void cthd_engine_adaptive::update_engine_state() {
+ 	int target = evaluate_conditions();
+-	if (target == -1)
++	if (target == -1) {
++		if (fallback_id >= 0 && !policy_active) {
++			exec_fallback_target(targets[fallback_id].target_id);
++			policy_active = 1;
++		}
+ 		return;
++	}
+ 	for (int i = 0; i < (int) targets.size(); i++) {
+ 		if (targets[i].target_id != (uint64_t) target)
+ 			continue;
+@@ -1251,6 +1268,34 @@ void cthd_engine_adaptive::update_engine_state() {
+ 	policy_active = 1;
+ }
+ 
++int cthd_engine_adaptive::find_agressive_target() {
++	int max_pl1_max = 0;
++	int max_target_id = -1;
++
++	for (int i = 0; i < (int) targets.size(); i++) {
++		int argument;
++
++		try {
++			argument = std::stoi(targets[i].argument, NULL);
++		}
++		catch (...) {
++			thd_log_info("Invalid target target:%s %s\n", targets[i].code.c_str(),
++					targets[i].argument.c_str());
++			continue;
++		}
++		thd_log_info("target:%s %d\n", targets[i].code.c_str(), argument);
++
++		if (targets[i].code == "PL1MAX") {
++			if (max_pl1_max < argument) {
++				max_pl1_max = argument;
++				max_target_id = i;
++			}
++		}
++	}
++
++	return max_target_id;
++}
++
+ static int is_event_device(const struct dirent *dir) {
+ 	return strncmp("event", dir->d_name, 5) == 0;
+ }
+@@ -1278,6 +1323,7 @@ void cthd_engine_adaptive::setup_input_devices() {
+ 		if (libevdev_has_event_code(tablet_dev, EV_SW, SW_TABLET_MODE))
+ 			return;
+ 		libevdev_free(tablet_dev);
++		tablet_dev = NULL;
+ 		close(fd);
+ 	}
+ }
+@@ -1292,13 +1338,13 @@ int cthd_engine_adaptive::thd_engine_start(bool ignore_cpuid_check) {
+ 
+ 	if (sysfs.read("bus/platform/devices/INT3400:00/firmware_node/path",
+ 			int3400_path) < 0) {
+-		thd_log_error("Unable to locate INT3400 firmware path\n");
++		thd_log_debug("Unable to locate INT3400 firmware path\n");
+ 		return THD_ERROR;
+ 	}
+ 
+ 	size = sysfs.size("bus/platform/devices/INT3400:00/data_vault");
+ 	if (size == 0) {
+-		thd_log_error("Unable to open GDDV data vault\n");
++		thd_log_debug("Unable to open GDDV data vault\n");
+ 		return THD_ERROR;
+ 	}
+ 
+@@ -1310,25 +1356,43 @@ int cthd_engine_adaptive::thd_engine_start(bool ignore_cpuid_check) {
+ 
+ 	if (sysfs.read("bus/platform/devices/INT3400:00/data_vault", buf, size)
+ 			< int(size)) {
+-		thd_log_error("Unable to read GDDV data vault\n");
++		thd_log_debug("Unable to read GDDV data vault\n");
+ 		return THD_ERROR;
+ 	}
+ 
+ 	if (parse_gddv(buf, size)) {
+-		thd_log_error("Unable to parse GDDV");
++		thd_log_debug("Unable to parse GDDV");
+ 		return THD_ERROR;
+ 	}
+ 
+ 	setup_input_devices();
+ 
+ 	upower_client = up_client_new();
+-	if (upower_client == NULL) {
+-		thd_log_error("Unable to connect to upower\n");
++	if (!upower_client) {
++		thd_log_info("Unable to connect to upower\n");
+ 	}
+ 
+ 	if (verify_conditions()) {
+-		thd_log_error("Unable to verify conditions are supported\n");
+-		return THD_ERROR;
++		thd_log_info("Some conditions are not supported, so check if any condition set can be matched\n");
++		int target = evaluate_conditions();
++		if (target == -1) {
++			thd_log_info("Also unable to evaluate any conditions\n");
++			thd_log_info("Falling back to use configuration with the highest power\n");
++
++			if (tablet_dev)
++				libevdev_free(tablet_dev);
++
++			// Looks like there is no free call for up_client_new()
++
++			int i = find_agressive_target();
++			thd_log_info("target:%d\n", i);
++			if (i >= 0) {
++				thd_log_info("fallback id:%d\n", i);
++				fallback_id = i;
++			} else {
++				return THD_ERROR;
++			}
++		}
+ 	}
+ 
+ 	set_control_mode(EXCLUSIVE);
+diff --git a/src/thd_engine_adaptive.h b/src/thd_engine_adaptive.h
+index 4084f4e..25c4bda 100644
+--- a/src/thd_engine_adaptive.h
++++ b/src/thd_engine_adaptive.h
+@@ -156,6 +156,7 @@ protected:
+ 	struct libevdev *tablet_dev;
+ 	int current_condition_set;
+ 	int policy_active;
++	int fallback_id;
+ 	int get_type(char *object, int *offset);
+ 	uint64_t get_uint64(char *object, int *offset);
+ 	char* get_string(char *object, int *offset);
+@@ -188,14 +189,17 @@ protected:
+ 	int evaluate_conditions();
+ 	void execute_target(struct adaptive_target target);
+ 	void setup_input_devices();
++	int find_agressive_target();
++	void exec_fallback_target(int target);
+ 	void dump_apat();
+ 	void dump_apct();
+ 	void dump_ppcc();
+ 	void dump_psvt();
+ public:
+ 	cthd_engine_adaptive() :
+-			cthd_engine_default("63BE270F-1C11-48FD-A6F7-3AF253FF3E2D"), current_condition_set(
+-					0xffff), policy_active(0) {
++			cthd_engine_default("63BE270F-1C11-48FD-A6F7-3AF253FF3E2D"), upower_client(
++					NULL), tablet_dev(NULL), current_condition_set(0xffff), policy_active(
++					0), fallback_id(-1) {
+ 	}
+ 
+ 	~cthd_engine_adaptive();
+-- 
+2.27.0
+

@@ -1,0 +1,35 @@
+From bcebb923d3f1acc226b7b0395ecb2b47e4c3f14b Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sun, 12 Apr 2020 15:30:42 -0700
+Subject: [PATCH 039/134] Fix up some more incorrect offset calculations
+
+Doing it this way was a bad idea, but here we are.
+
+(cherry picked from commit 2c5b7b28b4a9b9a287cb77377ac4e307e882a34d)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 042998dad95e60cd3adb95dd0f9b4b654b9cca35)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 45fd728..e77adc9 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -184,10 +184,10 @@ int cthd_engine_adaptive::parse_apct (char *apct, int len) {
+ 				if (i < 9) {
+ 					condition.operation = adaptive_operation(get_uint64(apct, &offset));
+ 					if (condition.operation == FOR) {
+-						offset += 8;
++						offset += 12;
+ 						condition.time_comparison = adaptive_comparison(get_uint64(apct, &offset));
+ 						condition.time = get_uint64(apct, &offset);
+-						offset += 8;
++						offset += 12;
+ 						i++;
+ 					}
+ 				}
+-- 
+2.27.0
+

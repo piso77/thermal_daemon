@@ -1,0 +1,51 @@
+From 26228e234b2fcc25d24c3a191ceff9c7213a54ea Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Mon, 20 Jul 2020 08:51:10 -0700
+Subject: [PATCH 109/134] Add capability to exit on some Lenovo platforms
+
+Based on the presence of sysfs path, disable thermald on some platforms.
+
+(cherry picked from commit c222287bb845ef17d7265fc79fa4c5665f8929ac)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 73588b446f6d6cf88b43d3e9ff395012dc8a9b79)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine.cpp | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/src/thd_engine.cpp b/src/thd_engine.cpp
+index f1bee30..8d736c8 100644
+--- a/src/thd_engine.cpp
++++ b/src/thd_engine.cpp
+@@ -695,6 +695,10 @@ static supported_ids_t id_table[] = {
+ 		{ 6, 0xa7 }, // Rocketlake
+ 		{ 0, 0 } // Last Invalid entry
+ };
++
++std::vector<std::string> blocklist_paths {
++	"/devices/platform/thinkpad_acpi/dytc_lapmode",
++};
+ #endif
+ 
+ int cthd_engine::check_cpu_id() {
+@@ -739,6 +743,17 @@ int cthd_engine::check_cpu_id() {
+ 		thd_log_warn(" Need Linux PowerCap sysfs \n");
+ 	}
+ 
++
++	for (std::string path : blocklist_paths) {
++		struct stat s;
++
++		if (!stat(path.c_str(), &s)) {
++			proc_list_matched = false;
++			thd_log_warn("[%s] present: Thermald can't run on this platform\n", path.c_str());
++			break;
++		}
++	}
++
+ #endif
+ 	return THD_SUCCESS;
+ }
+-- 
+2.27.0
+

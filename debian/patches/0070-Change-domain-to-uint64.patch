@@ -1,0 +1,34 @@
+From 6323c5bfb18830de16125e91502b8bf521363cf5 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 24 Jul 2020 11:08:50 -0700
+Subject: [PATCH 070/134] Change domain to uint64
+
+From the code
+psv.domain = get_uint64(buf, &offset);
+
+But header was saying string.
+
+(cherry picked from commit eb0fb92703e0663d61eb147c6fa184a6036718db)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 89eb5bcf51e695eb47a4f41b082e36441e4f2f75)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_adaptive_types.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/thd_adaptive_types.h b/src/thd_adaptive_types.h
+index c2b47fd..2562095 100644
+--- a/src/thd_adaptive_types.h
++++ b/src/thd_adaptive_types.h
+@@ -5,7 +5,7 @@ struct adaptive_target {
+ 	uint64_t target_id;
+ 	std::string name;
+ 	std::string participant;
+-	std::string domain;
++	uint64_t domain;
+ 	std::string code;
+ 	std::string argument;
+ };
+-- 
+2.27.0
+

@@ -1,0 +1,81 @@
+From 35392575106548c9466dda0edc3b1bd5c2c7ea3f Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sat, 11 Apr 2020 16:18:40 -0700
+Subject: [PATCH 027/134] Allow engines to force the use of MMIO for RAPL
+
+In adaptive mode we prefer the use of the MMIO RAPL interface if available.
+
+(cherry picked from commit f9795f52ecca95d47eeae441101613a97bfcd4f1)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 3c16271d03aa008116b6148bedd82e8c5e822d97)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_default.cpp |  6 +++++-
+ src/thd_engine_default.h   | 10 ++++++----
+ 2 files changed, 11 insertions(+), 5 deletions(-)
+
+diff --git a/src/thd_engine_default.cpp b/src/thd_engine_default.cpp
+index 200c5d5..2c2f4bb 100644
+--- a/src/thd_engine_default.cpp
++++ b/src/thd_engine_default.cpp
+@@ -678,7 +678,7 @@ int cthd_engine_default::read_cooling_devices() {
+ 	}
+ 
+ 	// Add RAPL mmio cooling device
+-	if (!disable_active_power && parser.thermal_matched_platform_index() >= 0) {
++	if (!disable_active_power && (parser.thermal_matched_platform_index() >= 0 || force_mmio_rapl)) {
+ 		cthd_sysfs_cdev_rapl *rapl_mmio_dev =
+ 				new cthd_sysfs_cdev_rapl(
+ 						current_cdev_index, 0,
+@@ -687,6 +687,10 @@ int cthd_engine_default::read_cooling_devices() {
+ 		if (rapl_mmio_dev->update() == THD_SUCCESS) {
+ 			cdevs.push_back(rapl_mmio_dev);
+ 			++current_cdev_index;
++
++			// Prefer MMIO access over MSR access for B0D4
++			rapl_dev->set_cdev_alias("");
++			rapl_mmio_dev->set_cdev_alias("B0D4");
+ 		} else {
+ 			delete rapl_mmio_dev;
+ 		}
+diff --git a/src/thd_engine_default.h b/src/thd_engine_default.h
+index 206be58..1acf5b8 100644
+--- a/src/thd_engine_default.h
++++ b/src/thd_engine_default.h
+@@ -43,27 +43,29 @@ private:
+ 	int tcc_offset_low;
+ #endif
+ 
++protected:
++	bool force_mmio_rapl;
+ public:
+ 	static const int power_clamp_reduction_percent = 5;
+ #ifndef ANDROID
+ 	cthd_engine_default() :
+ 			cthd_engine("42A441D6-AE6A-462b-A84B-4A8CE79027D3"),
+ 			workaround_interval(0), tcc_offset_checked(0),
+-			tcc_offset_low(0) {
++			tcc_offset_low(0), force_mmio_rapl(false) {
+ 	}
+ 	cthd_engine_default(std::string _uuid) :
+ 			cthd_engine(_uuid),
+ 			workaround_interval(0), tcc_offset_checked(0),
+-			tcc_offset_low(0) {
++			tcc_offset_low(0), force_mmio_rapl(false) {
+ 	}
+ #else
+ 	cthd_engine_default() :
+ 			cthd_engine("42A441D6-AE6A-462b-A84B-4A8CE79027D3"),
+-			workaround_interval(0) {
++			workaround_interval(0), force_mmio_rapl(false) {
+ 	}
+ 	cthd_engine_default(std::string _uuid) :
+ 			cthd_engine(_uuid),
+-			workaround_interval(0) {
++			workaround_interval(0), force_mmio_rapl(false) {
+ 	}
+ 
+ #endif
+-- 
+2.27.0
+

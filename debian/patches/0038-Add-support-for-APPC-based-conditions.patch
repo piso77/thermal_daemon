@@ -1,0 +1,116 @@
+From 2ab0ca73c13339345f3d28c1dcf3510b56453f81 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sun, 12 Apr 2020 15:27:31 -0700
+Subject: [PATCH 038/134] Add support for APPC-based conditions
+
+Some systems use APPC to provide additional information associated with
+conditions. Parse that and then merge it into our conditions.
+
+(cherry picked from commit 59bd4476999460654d80351dc0a031b5cf28e979)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 24ab73aa32d99695d1563ff4974910ae28c944d4)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 45 ++++++++++++++++++++++++++++++++++++-
+ src/thd_engine_adaptive.h   | 11 +++++++++
+ 2 files changed, 55 insertions(+), 1 deletion(-)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index fb33849..45fd728 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -74,8 +74,50 @@ char * cthd_engine_adaptive::get_string(char *object, int *offset) {
+         return value;
+ }
+ 
++int cthd_engine_adaptive::merge_custom(struct custom_condition *custom, struct condition *condition) {
++	condition->device = custom->participant;
++	condition->condition = (enum adaptive_condition)custom->type;
++
++	return 0;
++}
++
++int cthd_engine_adaptive::merge_appc () {
++	for (int i = 0; i < (int)custom_conditions.size(); i++) {
++		for (int j = 0; j < (int)conditions.size(); j++) {
++			for (int k = 0; k < (int)conditions[j].size(); k++) {
++				if (custom_conditions[i].condition ==
++				    conditions[j][k].condition) {
++					merge_custom(&custom_conditions[i],
++						     &conditions[j][k]);
++				}
++			}
++		}
++	}
++
++	return 0;
++}
++
+ int cthd_engine_adaptive::parse_appc (char *appc, int len) {
+-	/* Currently unhandled */
++	int offset = 0;
++	uint64_t version = get_uint64(appc, &offset);
++
++	if (version != 1) {
++		// Invalid APPC tables aren't fatal
++		thd_log_info("Found unsupported or malformed APPC version %d\n", (int)version);
++		return 0;
++	}
++
++	while (offset < len) {
++		struct custom_condition condition;
++
++		condition.condition = (enum adaptive_condition)get_uint64(appc, &offset);
++		condition.name = get_string(appc, &offset);
++		condition.participant = get_string(appc, &offset);
++		condition.domain = get_uint64(appc, &offset);
++		condition.type = get_uint64(appc, &offset);
++		custom_conditions.push_back(condition);
++	}
++
+         return 0;
+ }
+ 
+@@ -389,6 +431,7 @@ int cthd_engine_adaptive::parse_gddv(char *buf, int size) {
+ 		delete(val);
+ 	}
+ 
++	merge_appc();
+ 	return 0;
+ }
+ 
+diff --git a/src/thd_engine_adaptive.h b/src/thd_engine_adaptive.h
+index a5c6a7c..3241662 100644
+--- a/src/thd_engine_adaptive.h
++++ b/src/thd_engine_adaptive.h
+@@ -125,16 +125,27 @@ struct condition {
+ 	int state_entry_time;
+ };
+ 
++struct custom_condition {
++	enum adaptive_condition condition;
++	std::string name;
++	std::string participant;
++	int domain;
++	int type;
++};
++
+ class cthd_engine_adaptive: public cthd_engine_default {
+ protected:
+ 	std::vector<ppcc_t> ppccs;
+ 	std::vector<std::vector<struct condition>> conditions;
++	std::vector<struct custom_condition> custom_conditions;
+ 	std::vector<struct adaptive_target> targets;
+ 	std::vector<struct psvt> psvts;
+ 	std::string int3400_path;
+ 	int get_type(char *object, int *offset);
+ 	uint64_t get_uint64(char *object, int *offset);
+ 	char *get_string(char *object, int *offset);
++	int merge_custom(struct custom_condition *custom, struct condition *condition);
++	int merge_appc(void);
+ 	int parse_appc(char *appc, int len);
+ 	int parse_apat(char *apat, int len);
+ 	int parse_apct(char *apct, int len);
+-- 
+2.27.0
+

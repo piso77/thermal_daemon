@@ -1,0 +1,90 @@
+From 74cf3428b41d1f585d5ca35538970ec521a307a6 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 31 Jul 2020 15:57:56 -0700
+Subject: [PATCH 068/134] Add new trip interfaces
+
+Added new interface for target type manipulation. This will
+allow to check if target state is valid and also make it
+invalid.
+
+Also ignore processing for invalid trip.
+
+(cherry picked from commit 173301428c139072316b02efa6b0f11f18dafd07)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 22cb5ef48a63fdd7d3460a645cb970b951b71c02)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_trip_point.cpp |  3 +++
+ src/thd_trip_point.h   | 42 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 45 insertions(+)
+
+diff --git a/src/thd_trip_point.cpp b/src/thd_trip_point.cpp
+index 0533a70..2f45f5b 100644
+--- a/src/thd_trip_point.cpp
++++ b/src/thd_trip_point.cpp
+@@ -94,6 +94,9 @@ bool cthd_trip_point::thd_trip_point_check(int id, unsigned int read_temp,
+ 
+ 	*reset = false;
+ 
++	if (type == INVALID_TRIP_TYPE)
++		return false;
++
+ 	if (depend_cdev && read_temp >= temp) {
+ 		int _state = depend_cdev->get_curr_state();
+ 		int valid = 0;
+diff --git a/src/thd_trip_point.h b/src/thd_trip_point.h
+index 65ce855..3e643e8 100644
+--- a/src/thd_trip_point.h
++++ b/src/thd_trip_point.h
+@@ -151,6 +151,48 @@ public:
+ 		return cdevs.size();
+ 	}
+ 
++
++	int is_target_valid(int &target_state) {
++		target_state = 0;
++		for (unsigned int i = 0; i < cdevs.size(); ++i) {
++			trip_pt_cdev_t &cdev = cdevs[i];
++
++			if (cdev.target_state_valid) {
++				thd_log_debug("matched %d\n", cdev.target_state);
++				target_state = cdev.target_state;
++				return THD_SUCCESS;
++			}
++		}
++
++		return THD_ERROR;
++	}
++
++	int set_target_invalid() {
++		for (unsigned int i = 0; i < cdevs.size(); ++i) {
++			trip_pt_cdev_t &cdev = cdevs[i];
++			cdev.target_state_valid = 0;
++			return THD_SUCCESS;
++		}
++		return THD_ERROR;
++	}
++
++	int set_first_target(int state) {
++		for (unsigned int i = 0; i < cdevs.size(); ++i) {
++			trip_pt_cdev_t &cdev = cdevs[i];
++			cdev.target_state_valid = 1;
++			cdev.target_state = state;
++			return THD_SUCCESS;
++		}
++		return THD_ERROR;
++	}
++
++	cthd_cdev* get_first_cdev() {
++		if (!cdevs.size())
++			return NULL;
++
++		return cdevs[0].cdev;
++	}
++
+ 	void set_dependency(std::string cdev, std::string state_str);
+ 
+ #ifndef ANDROID
+-- 
+2.27.0
+

@@ -1,0 +1,40 @@
+From b6d26c821519596550599459cd00a7d20c7e0e7a Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sun, 26 Apr 2020 11:27:41 -0700
+Subject: [PATCH 055/134] Add some missing condition enum entries
+
+We were out of sync for higher conditions, which caused misinterpretation
+of legitimate values.
+
+(cherry picked from commit 61bf5ec100d62851f7bd99ee205612363ab5c9c1)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit aacc57e267a8867448ab16ae1fae79aa043deffb)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.h | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/src/thd_engine_adaptive.h b/src/thd_engine_adaptive.h
+index ed92fb5..51d2d01 100644
+--- a/src/thd_engine_adaptive.h
++++ b/src/thd_engine_adaptive.h
+@@ -63,6 +63,8 @@ enum adaptive_condition {
+ 	ARTG,
+ 	CTYP,
+ 	PROP,
++        Unk1,
++	Unk2,
+ 	Battery_state,
+ 	Battery_rate,
+ 	Battery_remaining,
+@@ -71,6 +73,7 @@ enum adaptive_condition {
+ 	Battery_cycles,
+ 	Battery_last_full,
+ 	Power_personality,
++	Battery_design_capacity,
+ 	Screen_state,
+ 	AVOL,
+ 	ACUR,
+-- 
+2.27.0
+

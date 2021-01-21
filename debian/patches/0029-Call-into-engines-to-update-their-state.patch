@@ -1,0 +1,45 @@
+From 0e231e78fec5bb4706b466722ec5b0669492ae61 Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Sat, 11 Apr 2020 16:20:20 -0700
+Subject: [PATCH 029/134] Call into engines to update their state
+
+This is something of a hack right now (it should be event driven rather
+than polling), but we need to update the adaptive engine state to check
+whether we should transition to a new target.
+
+(cherry picked from commit a4f03755f474fd3d745ad848774fed18a6778a13)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit ddd660923f8390dae6ba43ba2ff531d011996f9e)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine.cpp | 1 +
+ src/thd_engine.h   | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/src/thd_engine.cpp b/src/thd_engine.cpp
+index afb52eb..e4c4ef1 100644
+--- a/src/thd_engine.cpp
++++ b/src/thd_engine.cpp
+@@ -154,6 +154,7 @@ void cthd_engine::thd_engine_thread() {
+ 				thd_log_debug("Terminating thread..\n");
+ 			}
+ 		}
++		update_engine_state();
+ 		workarounds();
+ 	}
+ 	thd_log_debug("thd_engine_thread_end\n");
+diff --git a/src/thd_engine.h b/src/thd_engine.h
+index 6c3538d..c96a3f4 100644
+--- a/src/thd_engine.h
++++ b/src/thd_engine.h
+@@ -177,6 +177,7 @@ public:
+ 	void thd_read_default_thermal_zones();
+ 	void thd_read_default_cooling_devices();
+ 
++	virtual void update_engine_state() {};
+ 	virtual int read_thermal_sensors() {
+ 		return 0;
+ 	}
+-- 
+2.27.0
+

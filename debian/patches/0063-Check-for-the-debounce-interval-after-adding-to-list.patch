@@ -1,0 +1,62 @@
+From a6e3787211a261290e97aba9ba757e9b9d90cd9d Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Wed, 29 Jan 2020 06:19:32 -0800
+Subject: [PATCH 063/134] Check for the debounce interval after adding to list
+
+In ths way all the trips are added to the list, so that on
+desctivation the correct state is restored.
+
+(cherry picked from commit 8eda0669e3edf9f263b5eefa342523e8866cd850)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit f3727109b5080f804d70f103fbe8cb026a4991b5)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_cdev.cpp | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/src/thd_cdev.cpp b/src/thd_cdev.cpp
+index 2f91e01..190eff9 100644
+--- a/src/thd_cdev.cpp
++++ b/src/thd_cdev.cpp
+@@ -202,15 +202,6 @@ int cthd_cdev::thd_cdev_set_state(int set_point, int target_temp,
+ 			target_temp, temperature, index, state, zone_id, trip_id,
+ 			target_state_valid, target_value, force);
+ 
+-	if (!force && last_state == state && state
+-			&& (tm - last_action_time) <= debounce_interval) {
+-		thd_log_debug(
+-				"Ignore: delay < debounce interval : %d, %d, %d, %d, %d\n",
+-				set_point, temperature, index, get_curr_state(), max_state);
+-		return THD_SUCCESS;
+-	}
+-	last_state = state;
+-
+ 	if (state) {
+ 		bool found = false;
+ 		bool first_entry = false;
+@@ -262,6 +253,14 @@ int cthd_cdev::thd_cdev_set_state(int set_point, int target_temp,
+ 			thd_log_info("Already more constraint\n");
+ 			return THD_SUCCESS;
+ 		}
++
++		if (!force && last_state == state && state
++			&& (tm - last_action_time) <= debounce_interval) {
++			thd_log_debug(
++				"Ignore: delay < debounce interval : %d, %d, %d, %d, %d\n",
++				set_point, temperature, index, get_curr_state(), max_state);
++			return THD_SUCCESS;
++		}
+ 	} else {
+ 		thd_log_debug("zone_trip_limits.size() %zu\n", (size_t)zone_trip_limits.size());
+ 		if (zone_trip_limits.size() > 0) {
+@@ -324,6 +323,7 @@ int cthd_cdev::thd_cdev_set_state(int set_point, int target_temp,
+ 	}
+ 
+ 	last_action_time = tm;
++	last_state = state;
+ 
+ 	curr_state = get_curr_state();
+ 	if (curr_state == get_min_state()) {
+-- 
+2.27.0
+

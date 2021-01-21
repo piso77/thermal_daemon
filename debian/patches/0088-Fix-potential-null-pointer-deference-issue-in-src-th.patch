@@ -1,0 +1,43 @@
+From 5c0e1a9ec836842e80d10ff46ba05e01ce2445de Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Wed, 19 Aug 2020 17:30:02 -0700
+Subject: [PATCH 088/134] Fix potential null pointer deference issue in
+ src/thd_engine_adaptive.cpp
+
+1121 // This is only for debug to plot power, so keep
+deref_ptr_in_call: Dereferencing pointer _zone.
+1122 if (_zone->get_zone_type() == "rapl_pkg_power")
+1123  continue;
+1124
+CID 103179 (#1 of 1): Dereference before null check (REVERSE_INULL)
+check_after_deref: Null-checking _zone suggests that it may be null,
+but it has already been dereferenced on all paths leading to the check.
+
+1125 if (_zone && _zone->zone_active_status())
+1126  _zone->set_zone_inactive();
+1127 }
+
+(cherry picked from commit eab4215c196e7a80b29d9a6b1b76f23f74614625)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 5d62a2d6d0c4a3cce876b142e6dde90614614fa0)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 2339e8b..26d5b92 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -1119,7 +1119,7 @@ void cthd_engine_adaptive::set_int3400_target(struct adaptive_target target) {
+ 			cthd_zone *_zone = zones[i];
+ 
+ 			// This is only for debug to plot power, so keep
+-			if (_zone->get_zone_type() == "rapl_pkg_power")
++			if (_zone && _zone->get_zone_type() == "rapl_pkg_power")
+ 				continue;
+ 
+ 			if (_zone && _zone->zone_active_status())
+-- 
+2.27.0
+

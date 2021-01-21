@@ -1,0 +1,38 @@
+From 427c345987ba212e62e337d94f9d9c4f33b9c699 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Wed, 29 Jan 2020 06:43:33 -0800
+Subject: [PATCH 016/134] Sleep for thermal sysfs to be ready
+
+On atleast on one system, the thermal sysfs is not ready when
+thermald started. Added a sleep if the thermal sysfs is not present
+and retry.
+
+(cherry picked from commit 9b88ca823e93c39e2c9be3589ad2783d397c91d3)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 774df7afc3228dd577122df0775a476a3eb41233)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine.cpp | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/src/thd_engine.cpp b/src/thd_engine.cpp
+index 429e0ff..903d191 100644
+--- a/src/thd_engine.cpp
++++ b/src/thd_engine.cpp
+@@ -719,6 +719,13 @@ void cthd_engine::thd_read_default_thermal_sensors() {
+ 	const std::string base_path = "/sys/class/thermal/";
+ 	int max_index = 0;
+ 
++	if ((dir = opendir("/sys/class/thermal/thermal_zone1/")) == NULL) {
++		thd_log_info("Waiting for thermal sysfs to be ready\n");
++		sleep(2);
++	} else {
++		closedir(dir);
++	}
++
+ 	thd_log_debug("thd_read_default_thermal_sensors \n");
+ 	if ((dir = opendir(base_path.c_str())) != NULL) {
+ 		while ((entry = readdir(dir)) != NULL) {
+-- 
+2.27.0
+

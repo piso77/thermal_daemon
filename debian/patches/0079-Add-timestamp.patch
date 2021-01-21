@@ -1,0 +1,45 @@
+From 0cee46686851810c9e25265e7be583579973090e Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Fri, 24 Jan 2020 21:29:30 -0800
+Subject: [PATCH 079/134] Add timestamp
+
+Added timestamp to logs.
+
+(cherry picked from commit e79199a38aa2349b5645be9347ff2444ff46bb65)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit e14cd3e86aa5157b1ba16e64bfb05501fd27421e)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/main.cpp | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/src/main.cpp b/src/main.cpp
+index f167a03..fb48704 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -88,6 +88,7 @@ void thd_logger(const gchar *log_domain, GLogLevelFlags log_level,
+ 
+ 	int syslog_priority;
+ 	const char *prefix;
++	time_t seconds;
+ 
+ 	switch (log_level) {
+ 	case G_LOG_LEVEL_ERROR:
+@@ -117,10 +118,12 @@ void thd_logger(const gchar *log_domain, GLogLevelFlags log_level,
+ 		break;
+ 	}
+ 
++	seconds = time(NULL);
++
+ 	if (thd_daemonize)
+-		syslog(syslog_priority, "%s%s", prefix, message);
++		syslog(syslog_priority, "[%ld]%s%s", seconds, prefix, message);
+ 	else
+-		g_print("%s%s", prefix, message);
++		g_print("[%ld]%s%s", seconds, prefix, message);
+ 
+ }
+ 
+-- 
+2.27.0
+

@@ -1,0 +1,34 @@
+From 97be5bd0f77c2cd2a0ef7c4fe9c74e1ca4826a41 Mon Sep 17 00:00:00 2001
+From: Jan Palus <atler@pld-linux.org>
+Date: Mon, 29 Jun 2020 23:25:17 +0200
+Subject: [PATCH 080/134] Make timestamp logging more portable
+
+fixes #234
+
+(cherry picked from commit a7097fce5e5ba28f887a55018751837eff831ec5)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit e18a74d7694f057ecefb370a0f982a2e9941d35d)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/main.cpp | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/main.cpp b/src/main.cpp
+index fb48704..c18e801 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -121,9 +121,9 @@ void thd_logger(const gchar *log_domain, GLogLevelFlags log_level,
+ 	seconds = time(NULL);
+ 
+ 	if (thd_daemonize)
+-		syslog(syslog_priority, "[%ld]%s%s", seconds, prefix, message);
++		syslog(syslog_priority, "[%lld]%s%s", (long long) seconds, prefix, message);
+ 	else
+-		g_print("[%ld]%s%s", seconds, prefix, message);
++		g_print("[%lld]%s%s", (long long) seconds, prefix, message);
+ 
+ }
+ 
+-- 
+2.27.0
+

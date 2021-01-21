@@ -1,0 +1,31 @@
+From 2fced0815b0b92865504dd7bb9bc0765e8b672d5 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Thu, 20 Aug 2020 11:46:49 -0700
+Subject: [PATCH 092/134] Fix  resource (memory) leak in
+ src/thd_engine_adaptive.cpp
+
+Fix #257
+
+(cherry picked from commit 66673cd37308c2ecd1bd006cb97d34b8811e0d78)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 61f378db426c1d0e9c59aa34ab9ffbbfb8a7be98)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index f1a3184..c2df104 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -1360,6 +1360,7 @@ int cthd_engine_adaptive::thd_engine_start(bool ignore_cpuid_check) {
+ 	if (sysfs.read("bus/platform/devices/INT3400:00/data_vault", buf, size)
+ 			< int(size)) {
+ 		thd_log_debug("Unable to read GDDV data vault\n");
++		delete[] buf;
+ 		return THD_ERROR;
+ 	}
+ 
+-- 
+2.27.0
+

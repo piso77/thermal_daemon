@@ -1,0 +1,68 @@
+From 5af32bde2e4d31ff22b686bc94ff00a474c0c35a Mon Sep 17 00:00:00 2001
+From: Matthew Garrett <mjg59@google.com>
+Date: Fri, 10 Apr 2020 14:32:23 -0700
+Subject: [PATCH 084/134] Add adaptive option
+
+Add a command line option to enable the use of the adaptive engine.
+
+(cherry picked from commit 207f1c40379075608fefc1a13a4d3674722bd36b)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 92a84a8897d1a582d38c7fe148fdbca59cad0ada)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/main.cpp | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
+
+diff --git a/src/main.cpp b/src/main.cpp
+index 87a8558..9b46f7f 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -42,6 +42,7 @@
+ #include "thermald.h"
+ #include "thd_preference.h"
+ #include "thd_engine.h"
++#include "thd_engine_adaptive.h"
+ #include "thd_engine_default.h"
+ #include "thd_parse.h"
+ #include <syslog.h>
+@@ -174,11 +175,13 @@ int main(int argc, char *argv[]) {
+ 	gboolean no_daemon = FALSE;
+ 	gboolean systemd = FALSE;
+ 	gboolean test_mode = FALSE;
++	gboolean adaptive = FALSE;
+ 	gboolean ignore_default_control = FALSE;
+ 	gchar *conf_file = NULL;
+ 	gint poll_interval = -1;
+ 	gboolean success;
+ 	GOptionContext *opt_ctx;
++	int ret;
+ 
+ 	thd_daemonize = TRUE;
+ 	use_syslog = TRUE;
+@@ -197,6 +200,8 @@ int main(int argc, char *argv[]) {
+ 					"log severity: debug level and up: Max logging"), NULL },
+ 			{ "test-mode", 0, 0, G_OPTION_ARG_NONE, &test_mode, N_(
+ 					"Test Mode only: Allow non root user"), NULL },
++			{ "adaptive", 0, 0, G_OPTION_ARG_NONE, &adaptive, N_(
++					"adaptive mode: use adaptive performance tables if available"), NULL },
+ 			{ "poll-interval", 0, 0, G_OPTION_ARG_INT, &poll_interval,
+ 					N_("Poll interval in seconds: Poll for zone temperature changes. "
+ 						"If want to disable polling set to zero."), NULL },
+@@ -327,8 +332,12 @@ int main(int argc, char *argv[]) {
+ 		}
+ 	}
+ 
+-	if (thd_engine_create_default_engine((bool) ignore_cpuid_check,
+-			(bool) exclusive_control, conf_file) != THD_SUCCESS) {
++	if (adaptive)
++		ret = thd_engine_create_adaptive_engine((bool) ignore_cpuid_check);
++	else
++		ret = thd_engine_create_default_engine((bool) ignore_cpuid_check,
++						       (bool) exclusive_control, conf_file);
++	if (ret != THD_SUCCESS) {
+ 		clean_up_lockfile();
+ 		closelog();
+ 		exit(EXIT_FAILURE);
+-- 
+2.27.0
+

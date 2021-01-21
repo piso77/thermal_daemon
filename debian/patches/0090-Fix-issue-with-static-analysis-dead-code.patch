@@ -1,0 +1,87 @@
+From 5f69d67473fe37bf8d138b50482eedb16c8cdfc8 Mon Sep 17 00:00:00 2001
+From: Srinivas Pandruvada <srinivas.pandruvada@linux.intel.com>
+Date: Thu, 20 Aug 2020 11:16:56 -0700
+Subject: [PATCH 090/134] Fix issue with static analysis dead code
+
+Static analysis has detected two hunks of dead code in /src/thd_trip_point.h.
+As reported by issue #254.
+
+Remove the for loop as it is setting only the first element.
+
+(cherry picked from commit 427bdb54663beb329a8f556c8524267906149864)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+(cherry picked from commit 8f02a889b247f5a2aa8244c9025349e9eb75b71e)
+Signed-off-by: Paolo Pisati <paolo.pisati@canonical.com>
+---
+ src/thd_engine_adaptive.cpp |  6 +++---
+ src/thd_trip_point.h        | 12 +++++++-----
+ 2 files changed, 10 insertions(+), 8 deletions(-)
+
+diff --git a/src/thd_engine_adaptive.cpp b/src/thd_engine_adaptive.cpp
+index 2282042..7ce7685 100644
+--- a/src/thd_engine_adaptive.cpp
++++ b/src/thd_engine_adaptive.cpp
+@@ -1149,7 +1149,7 @@ void cthd_engine_adaptive::set_int3400_target(struct adaptive_target target) {
+ 						if (j == count - 1) {
+ 							// This is the last "MAX" trip
+ 							// So make the target state invalid and temperature + 1 C
+-							trip->set_target_invalid();
++							trip->set_first_target_invalid();
+ 							trip->update_trip_temp(
+ 									trip->get_trip_temp() + 1000);
+ 						} else {
+@@ -1162,7 +1162,7 @@ void cthd_engine_adaptive::set_int3400_target(struct adaptive_target target) {
+ 							cthd_cdev *cdev = next_trip->get_first_cdev();
+ 							if (!cdev) {
+ 								// Something wrong make the current target invalid
+-								trip->set_target_invalid();
++								trip->set_first_target_invalid();
+ 								trip->update_trip_temp(
+ 										trip->get_trip_temp() + 1000);
+ 								continue;
+@@ -1184,7 +1184,7 @@ void cthd_engine_adaptive::set_int3400_target(struct adaptive_target target) {
+ 							} else {
+ 								// It has different source and target so
+ 								// So make the target state invalid and temperature + 1 C
+-								trip->set_target_invalid();
++								trip->set_first_target_invalid();
+ 								trip->update_trip_temp(
+ 										trip->get_trip_temp() + 1000);
+ 							}
+diff --git a/src/thd_trip_point.h b/src/thd_trip_point.h
+index 3e643e8..a1818d1 100644
+--- a/src/thd_trip_point.h
++++ b/src/thd_trip_point.h
+@@ -167,22 +167,24 @@ public:
+ 		return THD_ERROR;
+ 	}
+ 
+-	int set_target_invalid() {
+-		for (unsigned int i = 0; i < cdevs.size(); ++i) {
+-			trip_pt_cdev_t &cdev = cdevs[i];
++	int set_first_target_invalid() {
++		if (cdevs.size()) {
++			trip_pt_cdev_t &cdev = cdevs[0];
+ 			cdev.target_state_valid = 0;
+ 			return THD_SUCCESS;
+ 		}
++
+ 		return THD_ERROR;
+ 	}
+ 
+ 	int set_first_target(int state) {
+-		for (unsigned int i = 0; i < cdevs.size(); ++i) {
+-			trip_pt_cdev_t &cdev = cdevs[i];
++		if (cdevs.size()) {
++			trip_pt_cdev_t &cdev = cdevs[0];
+ 			cdev.target_state_valid = 1;
+ 			cdev.target_state = state;
+ 			return THD_SUCCESS;
+ 		}
++
+ 		return THD_ERROR;
+ 	}
+ 
+-- 
+2.27.0
+
