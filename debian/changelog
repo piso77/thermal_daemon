@@ -1,3 +1,11 @@
+thermald (2.3-4ubuntu1) groovy; urgency=medium
+
+  * Backport the adaptive engine (and all the required dependencies)
+    from upstream https://github.com/intel/thermal_daemon.git up to
+    commit 7c2ec23 (LP: #1913186)
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Thu, 21 Jan 2021 15:41:25 +0100
+
 thermald (2.3-4) unstable; urgency=medium
 
   * Fix Homepage field in debian/control (Closes: #971246)
