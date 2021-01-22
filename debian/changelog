@@ -1,3 +1,11 @@
+thermald (1.9.1-1ubuntu0.4) focal; urgency=medium
+
+  * Backport the adaptive engine (and all the required dependencies)
+    from upstream https://github.com/intel/thermal_daemon.git up to
+    commit 7c2ec23 (LP: #1913186)
+
+ -- Paolo Pisati <paolo.pisati@canonical.com>  Tue, 12 Jan 2021 15:41:57 +0100
+
 thermald (1.9.1-1ubuntu0.3) focal; urgency=medium
 
   * Add Cometlake and Rocketlake CPU models (LP: #1896419)
